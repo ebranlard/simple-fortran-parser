@@ -18,7 +18,7 @@ import argparse
 
 DESCRIPTION="""Description:
 
-   Example: 
+   Example:
        $fortran_type_gen file1.f90 file2.f90
     """
 
@@ -30,26 +30,27 @@ def main(argv):
     args = parser.parse_args(argv)
     files=args.files
 
+
     for filename in files:
 #         (head,filebase)=os.path.split(f)
         (filebase,extension)=os.path.splitext(filename)
-        filename_out=filebase+'Tools'+extension
+        filename_out=filebase+'AutoTools'+extension
         process_file(filename,filename_out)
 
 def process_file(filename,filename_out):
     with open(filename,'r') as f:
-        F=FortranFile(filename);
-        F.read()
-        F.write_type_tools()
+        f=FortranFile(filename);
+        f.read()
+        f.write_type_tools()
 
 #                 m.to_file(fout2)
-# 
+#
 #             for l in L:
 #                 fout.write(l+'\n')
 
 
 
 if __name__ == "__main__":
-    #main(sys.argv[1:])
+#     main(sys.argv[1:])
+#     main(['test/WingTypes.f90','test/ObjectInfoTypes.f90','test/ProfileTypes.f90'])
     main(['test/WingTypes.f90'])
-
