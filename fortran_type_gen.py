@@ -51,6 +51,6 @@ def process_file(filename,filename_out):
 
 
 if __name__ == "__main__":
-#     main(sys.argv[1:])
+    main(sys.argv[1:])
 #     main(['test/WingTypes.f90','test/ObjectInfoTypes.f90','test/ProfileTypes.f90'])
-    main(['test/WingTypes.f90'])
+#     main(['test/WingTypes.f90'])

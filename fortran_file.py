@@ -3,11 +3,19 @@ from fortran_parse_tools import*
 
 S_TYPE_TOOLS='AutoTools'
 
+# The routines of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
+# e.g.  FortranType.write_tool_init,  FortranType.write_tool_term
+#
+# These methods then calls FortranDeclaration.get_init  for each of the declarations of the type
 TOOLS=[
-        {'interface':'init'     , 'routines':['init_inout']} ,
-        {'interface':'term'     , 'routines':['term_inout']} ,
-        {'interface':'write'    , 'routines':['term_inout']} ,
-        {'interface':'read'     , 'routines':['term_inout']} ,
+        {'interface':'init'     , 'routines':['0']} ,
+        {'interface':'initp'    , 'routines':['0','1']} ,
+        {'interface':'term'     , 'routines':['0']} ,
+        {'interface':'termp'    , 'routines':['0','1']} ,
+        {'interface':'write'    , 'routines':['0']} ,
+        {'interface':'writep'   , 'routines':['0','1']} ,
+        {'interface':'read'     , 'routines':['0']} ,
+        {'interface':'readp'    , 'routines':['0','1']} ,
         ]
 
 
@@ -198,7 +206,7 @@ class FortranModule:
                         end_line=',&'
                         if i==len(tool['routines'])-1:
                             end_line=''
-                        f.write('          %s_%s%s\n'%(t.pretty_name,routine_name,end_line))
+                        f.write('          %s_%s_%s%s\n'%(t.pretty_name,tool['interface'],routine_name,end_line))
                     f.write('    end interface %s_%s\n'%(t.pretty_name,tool['interface']))
             for tool in TOOLS:
                 if len(tool['interface'])>0:
@@ -218,10 +226,12 @@ class FortranModule:
         # --------------------------------------------------------------------------------
         # ---  Functions
         # --------------------------------------------------------------------------------
+        # The functions of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
         for t in self.TypeList:
             for tool in TOOLS:
                 if len(tool['interface'])>0:
-                    func_call='t.write_tool_%s(f)'%tool['interface']
+                    routines=tool['routines'];
+                    func_call='t.write_tool_%s(f,routines)'%tool['interface']
                     eval(func_call)
 #                 t.write_type_tools(f,self.indent)
 
@@ -296,6 +306,7 @@ class FortranType:
         self.raw_name=name
 
         # Derived data
+        self.bRecursive=False
         # Main Data
         self.pretty_name=self.pretty_type(name)
         self.dependencies=[]
@@ -312,6 +323,9 @@ class FortranType:
         for d in self.Declarations:
             if not d['built_in']:
                 self.dependencies.append(d['type'])
+                if d['type']==self.raw_name:
+                    print('Info: The following type is recursive:'+ d['type'])
+                    self.bRecursive=True
 
     def write_to_file(self,f,indent=''):
         f.write('%stype %s\n'%(indent,self.raw_name))
@@ -331,23 +345,32 @@ class FortranType:
         return(pretty_name.lower())
 
 
-    def _getRoutine1p(self,name):
+    def _getRoutine0p(self,name):
         FS=FortranSubroutine(self.pretty_name+name)
+        FS.setRecusive(self.bRecursive)
         FS.append_arg('type(%s), pointer :: %s '%(self.raw_name,'X'))
         return(FS)
-
-    def _getRoutine1io(self,name):
+    def _getRoutine1p(self,name):
         FS=FortranSubroutine(self.pretty_name+name)
+        FS.setRecusive(self.bRecursive)
+        FS.append_arg('type(%s), dimension(:), pointer :: %s '%(self.raw_name,'X'))
+        return(FS)
+
+    def _getRoutine0io(self,name):
+        FS=FortranSubroutine(self.pretty_name+name)
+        FS.setRecusive(self.bRecursive)
         FS.append_arg('type(%s), intent(inout) :: %s '%(self.raw_name,'X'))
         return(FS)
 
-    def _getRoutine1i(self,name):
+    def _getRoutine0i(self,name):
         FS=FortranSubroutine(self.pretty_name+name)
+        FS.setRecusive(self.bRecursive)
         FS.append_arg('type(%s), intent(in) :: %s '%(self.raw_name,'X'))
         return(FS)
 
-    def _getRoutine1o(self,name):
+    def _getRoutine0o(self,name):
         FS=FortranSubroutine(self.pretty_name+name)
+        FS.setRecusive(self.bRecursive)
         FS.append_arg('type(%s), intent(out) :: %s '%(self.raw_name,'X'))
         return(FS)
 
@@ -355,72 +378,148 @@ class FortranType:
     # --------------------------------------------------------------------------------
     # ---  TOOLS Writter
     # --------------------------------------------------------------------------------
-    def write_tool_init(self,f):
-#         FS=self._getRoutine1p('_init_pointer')
-#         for d in self.Declarations:
-#             FS.corpus.append(d.get_init('X%'))
-#         FS.write_to_file(f)
 
-        FS=self._getRoutine1io('_init_inout')
+    # Tools that write the initialization function of a derived type
+    def write_tool_init(self,f,routines):
+        bSimpleInOut=False
+        if ('0' in routines) and not bSimpleInOut:
+            FS=self._getRoutine0io('_init_0')
+            for d in self.Declarations:
+                FS.append_corpus(d.get_init('X%'))
+            FS.write_to_file(f)
+#         if ('inout' in routines) and bSimpleInOut:
+#             FS=self._getRoutine0io('_init_inout')
+#             FS.append_var('type(%s), pointer :: %s '%(self.raw_name,'pX'))
+#             FS.append_corpus('pX=>X')
+#             FS.append_corpus('call %s_%s(pX)'%(self.pretty_name,'init'))
+#             FS.write_to_file(f)
+    def write_tool_initp(self,f,routines):
+        if ('0' in routines):
+            FS=self._getRoutine0p('_initp_0')
+            FS.append_corpus('if (associated(X)) then')
+            for d in self.Declarations:
+                FS.append_corpus(d.get_init('X%'))
+            FS.append_corpus('endif')
+            FS.write_to_file(f)
+        if ('1' in routines):
+            FS=self._getRoutine1p('_initp_1')
+            FS.append_var('integer :: iX')
+            FS.append_corpus('if (associated(X)) then')
+            FS.append_corpus('    do iX=1,size(X)')
+            FS.append_corpus('        call %s_%s(X(iX))'%(self.pretty_name,'init'))
+            FS.append_corpus('    enddo')
+            FS.append_corpus('endif')
+            FS.write_to_file(f)
+
+    # Tools that write the termination function of a derived type
+    def write_tool_term(self,f,routines):
+        FS=self._getRoutine0io('_term_0')
         for d in self.Declarations:
-            FS.corpus.append(d.get_init('X%'))
+            FS.append_corpus(d.get_term('X%'))
+        FS.write_to_file(f)
+    def write_tool_termp(self,f,routines):
+        FS=self._getRoutine0p('_termp_0')
+        FS.append_corpus('if (associated(X)) then')
+        for d in self.Declarations:
+            FS.append_corpus(d.get_term('X%'))
+        FS.append_corpus('endif')
         FS.write_to_file(f)
 
-    def write_tool_term(self,f):
-#         FS=self._getRoutine1p('_term_pointer')
-#         for d in self.Declarations:
-#             FS.corpus.append(d.get_term('X%'))
-#         FS.write_to_file(f)
+        if ('1' in routines):
+            FS=self._getRoutine1p('_termp_1')
+            FS.append_var('integer :: iX')
+            FS.append_corpus('if (associated(X)) then')
+            FS.append_corpus('    do iX=1,size(X)')
+            FS.append_corpus('        call %s_%s(X(iX))'%(self.pretty_name,'term'))
+            FS.append_corpus('    enddo')
+            FS.append_corpus('    deallocate(X)')
+            FS.append_corpus('endif')
+            FS.write_to_file(f)
 
-        FS=self._getRoutine1io('_term_inout')
-        for d in self.Declarations:
-            FS.corpus.append(d.get_term('X%'))
-        FS.write_to_file(f)
-
-#         FS.name=FS.name.replace('pointer','inout')
+#         FS.name=FS.name.replace('pointer','0')
 #         FS.write_to_file_inout(f)
 
 
-    def write_tool_write(self,f):
-#         FS=self._getRoutine1p('_write_pointer')
-#         FS.append_arg('integer, intent(in) :: iunit')
-#         FS.corpus.append('if (associated(X)) then')
-#         for d in self.Declarations:
-#             FS.corpus.append(d.get_write('X%'))
-#         FS.corpus.append('endif')
-#         FS.write_to_file(f)
 
-        FS=self._getRoutine1i('_write_inout')
+    def write_tool_write(self,f,routines):
+        FS=self._getRoutine0i('_write_0')
         FS.append_arg('integer, intent(in) :: iunit')
         for d in self.Declarations:
-            FS.corpus.append(d.get_write('X%'))
+            FS.append_corpus(d.get_write('X%'))
         FS.write_to_file(f)
 
-
-    def write_tool_read(self,f):
-#         FS=self._getRoutine1p('_read_pointer')
-#         FS.append_arg('integer, intent(in) :: iunit')
-#         FS.corpus.append('logical :: bPresent')
-#         FS.corpus.append('integer :: n1')
-#         FS.corpus.append('integer :: n2')
-#         FS.corpus.append('integer :: n3')
-#         FS.corpus.append('integer :: n4')
-#         FS.corpus.append('if (associated(X)) then')
-#         for d in self.Declarations:
-#             FS.corpus.append(d.get_read('X%'))
-#         FS.corpus.append('endif')
-#         FS.write_to_file(f)
-
-        FS=self._getRoutine1o('_read_inout')
+    def write_tool_writep(self,f,routines):
+        FS=self._getRoutine0p('_writep_0')
         FS.append_arg('integer, intent(in) :: iunit')
-        FS.corpus.append('logical :: bPresent')
-        FS.corpus.append('integer :: n1')
-        FS.corpus.append('integer :: n2')
-        FS.corpus.append('integer :: n3')
-        FS.corpus.append('integer :: n4')
+        FS.append_corpus('write(iunit)associated(X)\n')
+        FS.append_corpus('if (associated(X)) then')
         for d in self.Declarations:
-            FS.corpus.append(d.get_read('X%'))
+            FS.append_corpus(d.get_write('X%'))
+        FS.append_corpus('endif')
         FS.write_to_file(f)
+        if ('1' in routines):
+            FS=self._getRoutine1p('_writep_1')
+            FS.append_arg('integer, intent(in) :: iunit')
+            FS.append_var('integer :: iX')
+            FS.append_corpus('write(iunit)associated(X)')
+            FS.append_corpus('if (associated(X)) then')
+            FS.append_corpus('    write(iunit)size(X)')
+            FS.append_corpus('    do iX=1,size(X)')
+            FS.append_corpus('         call %s_%s(X(iX),iunit)'%(self.pretty_name,'write'))
+            FS.append_corpus('    enddo')
+            FS.append_corpus('endif')
+            FS.write_to_file(f)
+
+
+    def write_tool_read(self,f,routines):
+        FS=self._getRoutine0o('_read_0')
+        FS.append_arg('integer, intent(in) :: iunit')
+        FS.append_var('logical :: bPresent')
+        FS.append_var('integer :: nd1')
+        FS.append_var('integer :: nd2')
+        FS.append_var('integer :: nd3')
+        FS.append_var('integer :: nd4')
+        for d in self.Declarations:
+            FS.append_corpus(d.get_read('X%'))
+        FS.write_to_file(f)
+    
+    def write_tool_readp(self,f,routines):
+        FS=self._getRoutine0p('_readp_0')
+        FS.append_arg('integer, intent(in) :: iunit')
+        FS.append_var('logical :: bPresent')
+        FS.append_var('integer :: nd1')
+        FS.append_var('integer :: nd2')
+        FS.append_var('integer :: nd3')
+        FS.append_var('integer :: nd4')
+        FS.append_corpus('read(iunit)bPresent')
+        FS.append_corpus('if (bPresent) then')
+        FS.append_corpus('allocate(X)')
+        for d in self.Declarations:
+            FS.append_corpus(d.get_read('X%'))
+        FS.append_corpus('endif')
+        FS.write_to_file(f)
+        if ('1' in routines):
+            FS=self._getRoutine1p('_readp_1')
+            FS.append_arg('integer, intent(in) :: iunit')
+            FS.append_var('integer :: iX')
+            FS.append_var('logical :: bPresent')
+            FS.append_var('integer :: nd1')
+            FS.append_corpus('read(iunit)bPresent')
+            FS.append_corpus('if (bPresent) then')
+            FS.append_corpus('    read(iunit)nd1')
+            FS.append_corpus('    if(associated(X).and. size(X)/=nd1) then')
+            FS.append_corpus('         print*,"ERROR X wrong size"')
+            FS.append_corpus('         STOP')
+            FS.append_corpus('    endif')
+            FS.append_corpus('    if(.not. associated(X)) then')
+#             FS.append_corpus('         print*,"allocating"')
+            FS.append_corpus('         allocate(X(nd1))')
+            FS.append_corpus('    endif')
+            FS.append_corpus('    do iX=1,nd1')
+            FS.append_corpus('         call %s_%s(X(iX),iunit)'%(self.pretty_name,'read'))
+            FS.append_corpus('    enddo')
+            FS.append_corpus('endif')
+            FS.write_to_file(f)
 
 
 
@@ -433,8 +532,25 @@ class FortranMethod(object):
         self.arglist_str=''
         self.arglist_raw=[]
         self.arglist=[]
+        self.varlist_str=''
+        self.varlist_raw=[]
+        self.varlist=[]
         self.corpus=[]
         self.indent='    '
+        self.bRecursive=False
+
+    def append_corpus(self,corpus):
+        self.corpus.append(corpus)
+
+    def append_var(self,var):
+        self.varlist_raw.append(var)
+        d=FortranDeclaration(var)
+        self.varlist.append(d)
+        if len(self.varlist_str)==0:
+            self.varlist_str=d['varname']
+        else:
+            self.varlist_str+=','+d['varname']
+
 
     def append_arg(self,arg):
         self.arglist_raw.append(arg)
@@ -445,14 +561,40 @@ class FortranMethod(object):
         else:
             self.arglist_str+=','+d['varname']
 
+    def setRecusive(self,bRecursive):
+        self.bRecursive=bRecursive
+
+    def remove_unused_var(self):
+        self.varlist=[d for d in self.varlist if (any([(d['varname'] in x) for x in self.corpus]))]
+#             for l in self.corpus:
+
+
     def write_to_file(self,f,indent='    '):
-        f.write('%s%s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
-        for d in self.arglist:
-            d.write_to_file(f,indent+self.indent)
-        for l in self.corpus:
-            if len(l)>0:
-                for ll in l.split('\n'):
-                    f.write('%s%s\n'%(indent+self.indent,ll))
+        if self.bRecursive:
+            f.write('%srecursive %s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
+        else:
+            f.write('%s%s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
+
+        # deleting unused variables
+        self.remove_unused_var()
+
+
+        if len(self.arglist)>0:
+            f.write('%s! Arguments declaration\n'%(indent+self.indent))
+            for d in self.arglist:
+                d.write_to_file(f,indent+self.indent)
+
+        if len(self.varlist)>0:
+            f.write('%s! Variable declaration\n'%(indent+self.indent))
+            for d in self.varlist:
+                d.write_to_file(f,indent+self.indent)
+
+        if len(self.corpus)>0:
+            f.write('%s! Corpus\n'%(indent+self.indent))
+            for l in self.corpus:
+                if len(l)>0:
+                    for ll in l.split('\n'):
+                        f.write('%s%s\n'%(indent+self.indent,ll))
         f.write('%send %s %s\n\n'%(indent,self.type,self.name))
 
     # A kind of hack
@@ -576,13 +718,19 @@ class FortranDeclaration(dict):
         if self['built_in']:
             if self['pointer']:
                 term='if (associated(%s)) deallocate(%s)'%(varname,varname)
-            if self['allocatable']:
+            elif self['allocatable']:
                 term='if (allocated(%s)) deallocate(%s)'%(varname,varname)
+            else:
+                if len(self['varvalue'])>0:
+                    # Adding an init 
+                    term='%s = %s ! reinit - to avoid unused variable message'%(varname,self['varvalue'])
         else:
             if self['pointer']:
-                term='if (associated(%s)) call %s_term(%s)'%(varname,self['pretty_type'],varname)
-            if self['allocatable']:
-                term='if (allocated(%s)) call %s_term(%s)'%(varname,self['pretty_type'],varname)
+                term='if (associated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+            elif self['allocatable']:
+                term='if (allocated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+            else:
+                term='call %s_term(%s)'%(self['pretty_type'],varname)
         return(term)
 
     def get_init(self,preffix=''):
@@ -595,7 +743,12 @@ class FortranDeclaration(dict):
                 else:
                     init='%s = %s'%(varname,self['varvalue'])
         else:
-            init='call %s_init(%s)'%(self['pretty_type'],varname)
+            if self['pointer']:
+                init='call %s_initp(%s)'%(self['pretty_type'],varname)
+            elif self['allocatable']:
+                init='call %s_initp(%s)'%(self['pretty_type'],varname)
+            else:
+                init='call %s_init(%s)'%(self['pretty_type'],varname)
         return(init)
 
     def get_write(self,preffix=''):
@@ -620,12 +773,14 @@ class FortranDeclaration(dict):
             else:
                 write='write(iunit)%s'%varname
         else:
-#             if self['pointer']:
+            if self['pointer']:
 #                 write='if (associated(%s)) call %s_write(%s)'%(varname,self['pretty_type'],varname)
-#             elif self['allocatable']:
+                write='call %s_writep(%s,iunit)'%(self['pretty_type'],varname)
+            elif self['allocatable']:
 #                 write='if (allocated(%s)) call %s_write(%s)'%(varname,self['pretty_type'],varname)
-#             else:
-            write='call %s_write(%s,iunit)'%(self['pretty_type'],varname)
+                write='call %s_writep(%s,iunit)'%(self['pretty_type'],varname)
+            else:
+                write='call %s_write(%s,iunit)'%(self['pretty_type'],varname)
         return(write)
 
     def get_read(self,preffix=''):
@@ -637,8 +792,8 @@ class FortranDeclaration(dict):
                 read+='if (bPresent) then\n'
                 ns=''
                 for i in range(self['ndimensions']):
-                    read+='    read(iunit)n%d\n'%(i+1)
-                    ns+='n%d,'%(i+1)
+                    read+='    read(iunit)nd%d\n'%(i+1)
+                    ns+='nd%d,'%(i+1)
                 ns=ns[:-1]
                 read+='    allocate(%s(%s))\n'%(varname,ns)
                 read+='    read(iunit)%s\n'%varname
@@ -646,12 +801,14 @@ class FortranDeclaration(dict):
             else:
                 read='read(iunit)%s'%(varname)
         else:
-#             if self['pointer']:
+            if self['pointer']:
 #                 read='if (associated(%s)) call %s_read(%s)'%(varname,self['pretty_type'],varname)
-#             elif self['allocatable']:
+                read='call %s_readp(%s,iunit)'%(self['pretty_type'],varname)
+            elif self['allocatable']:
 #                 read='if (allocated(%s)) call %s_read(%s)'%(varname,self['pretty_type'],varname)
-#             else:
-            read='call %s_read(%s,iunit)'%(self['pretty_type'],varname)
+                read='call %s_readp(%s,iunit)'%(self['pretty_type'],varname)
+            else:
+                read='call %s_read(%s,iunit)'%(self['pretty_type'],varname)
         return(read)
 
 class FortranArgument(FortranDeclaration):
