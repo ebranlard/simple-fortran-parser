@@ -55,9 +55,11 @@ def bind_lines(lines):
 # The case of comment after multiple line string is not supported
 def remove_comments(lines):
     parsed_lines=[];
+    comments=[];
     for line in lines:
         line=line.strip()
         pos=find_pos(line,'!')
+        comment=''
         l=line
         if len(pos)>0:
             if pos[0]==0:
@@ -76,14 +78,17 @@ def remove_comments(lines):
 
 
                 if bOK:
+                    comment=l[(pos[i]):]
                     l=l[:(pos[i])]
+                
 #                 else:
 #                     print('Prolematic line:')
 #                     print(line)
 
         if len(l)>0:
             parsed_lines.append(l)
-    return(parsed_lines)
+            comments.append(comment)
+    return(parsed_lines,comments)
 
 
 if __name__ == "__main__":

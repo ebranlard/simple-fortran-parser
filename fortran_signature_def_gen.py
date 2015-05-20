@@ -20,9 +20,10 @@ import argparse
 # ---  Main program
 # --------------------------------------------------------------------------------
 DESCRIPTION="""Description:
+    Generate signature file/ header file: .h .def
 
    Example:
-       $fortran_type_gen file1.f90 file2.f90
+       $fortran_signature_gen file1.f90 file2.f90
     """
 
 def main(argv):
@@ -35,17 +36,20 @@ def main(argv):
 
     # Looping on files and processing them
     for filename in files:
-        filename_out=get_type_tool_filename(filename)
-        process_file(filename,filename_out)
+#         process_file(filename,'STDOUT')
+        process_file(filename,'')
 
 def process_file(filename,filename_out):
     with open(filename,'r') as f:
         f=FortranFile(filename);
         f.read()
-        f.write_type_tools(filename_out)
+        f.write_signatures_def(filename_out)
 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+#     main(['/work/lib/OmniVor_lib/fortran/omnivor/link/InterfaceLink.f90'])
+#     main(['Interface.f90'])
+
 #     main(['test/WingTypes.f90','test/ObjectInfoTypes.f90','test/ProfileTypes.f90'])
 #     main(['test/WingTypes.f90'])

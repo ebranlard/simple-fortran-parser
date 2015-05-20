@@ -1,7 +1,18 @@
 #!/usr/bin/env python
+#############################################################
+# fortran_file: classes to read/parse/write a fortran file
+#############################################################
+# Description: 
+# Written by : Emmanuel Branlard
+# Date : May 2014
+# Dependencies : python
+# License : Feel free to modify and adapt it
+#############################################################
 from fortran_parse_tools import*
+from fortran_to_c import*
+import sys 
+import re
 
-S_TYPE_TOOLS='AutoTools'
 
 # The routines of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
 # e.g.  FortranType.write_tool_init,  FortranType.write_tool_term
@@ -19,6 +30,24 @@ TOOLS=[
         ]
 
 
+# --------------------------------------------------------------------------------
+# ---  THIS IS WHERE THE CHOICE OF A NAME TAKE PLACE
+# --------------------------------------------------------------------------------
+S_TYPE_TOOLS='AutoTools'
+def get_type_tool_filename(filename):
+    import os
+    (filebase,extension)=os.path.splitext(filename)
+    filename_out=filebase.replace('Types','')+S_TYPE_TOOLS+extension
+    return(filename_out)
+
+def get_type_tool_module(module):
+    module_out=module.replace('Types','')+S_TYPE_TOOLS
+    return(module_out)
+
+
+# --------------------------------------------------------------------------------
+# ---  FortranFile class
+# --------------------------------------------------------------------------------
 class FortranFile:
     def __init__(self,filename):
         self.filename=filename
@@ -29,41 +58,72 @@ class FortranFile:
             #print(self.filename)
             # Cleaning up input file
             L = bind_lines(f.readlines());
-            L = remove_comments(L);
+            (L,comments) = remove_comments(L);
 
             # --------------------------------------------------------------------------------
-            # --- Extracting types
+            # --- Extracting Modules, types and Use Statements
             # --------------------------------------------------------------------------------
             self.ModuleList=[]
             bIsInType=False
+            bIsInMethod=False
             bIsInModule=False
             m=None
+            s=None
             t=None
-            for l in L:
-                # always concatenate end with the keyword
-                if l[0:4].lower()=='end ':
-                    l='end'+l[4:]
-
-                words=l.split(' ')
-                if words[0].lower()=='module':
-                    # This is a new module
-                    m=(FortranModule(words[1]))
-                    bIsInModule=True
-                if words[0].lower()=='endmodule':
-                    self.ModuleList.append(m)
-                    bIsInModule=False
-                elif words[0].lower()=='use':
-                    m.UseStatements.append(l)
-                elif words[0].lower()=='type':
-                    # Creating a new type
-                    t=FortranType(words[1])
-                    bIsInType=True
-                elif words[0].lower()=='endtype':
-                    m.TypeList.append(t)
-                    bIsInType=False
+            lcat=''
+            for (l,c) in zip(L,comments):
+                if l.find('&')>=0:
+                    lcat=lcat+l;
                 else:
-                    if bIsInType:
-                        t.append(l)
+                    if len(lcat)>0:
+                        l=lcat+l;
+                        lcat=''
+
+                    # always concatenate end with the keyword
+                    if l[0:4].lower()=='end ':
+                        l='end'+l[4:]
+
+                    words=l.split(' ')
+                    words_low=l.lower().split(' ')
+                    if words[0].lower()=='module':
+                        # This is a new module
+                        m=(FortranModule(words[1]))
+                        bIsInModule=True
+                    elif words[0].lower()=='endmodule':
+                        self.ModuleList.append(m)
+                        bIsInModule=False
+
+                    if 'subroutine' in words_low or 'function' in words_low :
+                        # This is a new subroutine
+                        s=(FortranMethod(raw_name=l))
+                        bIsInMethod=True
+                    elif words[0].lower()=='endsubroutine':
+                        if bIsInModule:
+                            m.MethodList.append(s) 
+                            bIsInMethod=False
+                        else:
+                            print('Error, subroutines not inmodules not handled yet')
+                    elif words[0].lower()=='endfunction':
+                        if bIsInModule:
+                            m.MethodList.append(s)
+                            bIsInMethod=False
+                        else:
+                            print('Error, subroutines not inmodules not handled yet')
+                    elif words[0].lower()=='use':
+                        m.UseStatements.append(l)
+                    elif words[0].lower()=='type':
+                        if not bIsInMethod:
+                            # Creating a new type
+                            t=FortranType(words[1])
+                            bIsInType=True
+                    elif words[0].lower()=='endtype':
+                        m.TypeList.append(t)
+                        bIsInType=False
+                    else:
+                        if bIsInType:
+                            t.append(l,c)
+                        if bIsInMethod:
+                            s.append_raw(l,c)
 
 
             # --------------------------------------------------------------------------------
@@ -86,13 +146,50 @@ class FortranFile:
     def write_type_tools(self,filename_out=''):
         import os
         if filename_out=='':
-            (filebase,extension)=os.path.splitext(self.filename)
-            filename_out=filebase+S_TYPE_TOOLS+extension
+            filename_out=get_type_tool_filename(filename)
         with open(filename_out,'w') as f:
             for m in self.ModuleList:
                 m.write_type_tools(f)
 
 
+    def write_signatures(self,filename_out=''):
+        import os
+        if filename_out=='':
+            (filebase,extension)=os.path.splitext(self.filename)
+            filename_out=filebase+'.h'
+        if filename_out=='STDOUT':
+            f=sys.stdout
+        else:
+            f=open(filename_out,'w')
+        for m in self.ModuleList:
+            m.write_signatures(f)
+        if f is not sys.stdout:
+            f.close()
+
+
+    def write_signatures_def(self,filename_out=''):
+        import os
+        if filename_out=='':
+            (filebase,extension)=os.path.splitext(self.filename)
+            filename_out=filebase+'.def'
+        if filename_out=='STDOUT':
+            f=sys.stdout
+        else:
+            f=open(filename_out,'w')
+        if len(self.ModuleList)>1:
+            raise(Exception('More than one module'))
+        else:
+            m=self.ModuleList[0]
+            libname=m.name
+            if len(m.name)>9:
+                if m.name[0:9]=='Interface':
+                    libname=m.name[9:];
+                    libname=libname.lower()
+            f.write('LIBRARY lib%s.dll\n'%libname)
+            f.write('EXPORTS\n')
+            m.write_signatures_def(f)
+        if f is not sys.stdout:
+            f.close()
 
 
 
@@ -111,6 +208,7 @@ class FortranModule:
         # Interfaces
         # Variables
         # Methods
+        self.MethodList=[]
         # Misc
         self.indent='    '
 
@@ -126,7 +224,14 @@ class FortranModule:
             t.analyse_raw_data()
             self.type_dependencies.append(t.dependencies)
 
+        # Analyse use statements
         self.UseStatements.analyse_raw_data()
+        
+        # Analyse Methods
+        for m in self.MethodList:
+            #print('Analysing raw input for Method: '+m.name+m.raw_name)
+            m.analyse_raw_data()
+
 
         # --------------------------------------------------------------------------------
         # --- Type Dependencies
@@ -178,8 +283,17 @@ class FortranModule:
 
         f.write('end module %s\n'%self.name)
 
+    def write_signatures(self,f):
+        f.write('//Signatures from Module %s\n'%self.name)
+        for s in self.MethodList:
+            s.write_signature(f)
+
+    def write_signatures_def(self,f):
+        for s in self.MethodList:
+            s.write_signature_def(f)
+
     def write_type_tools(self,f):
-        f.write('module %s%s\n'%(self.name,S_TYPE_TOOLS))
+        f.write('module %s\n'%get_type_tool_module(self.name))
         f.write('    ! Module containing type: \n')
         f.write('    use %s\n'%(self.name))
         # Resolved dependencies
@@ -187,9 +301,9 @@ class FortranModule:
             f.write('    ! Friend modules: \n')
         for (m,t) in zip(self.type_depend_mod,self.type_dependencies):
             if m is not None:
-                f.write('    use %s%s\n'%(m,S_TYPE_TOOLS))
+                f.write('    use %s\n'%(get_type_tool_module(m)))
             else:
-                f.write('!    use %s%s\n'%(t,S_TYPE_TOOLS))
+                f.write('!    use %s\n'%(get_type_tool_module(t)))
 
         f.write('    implicit none\n\n')
         f.write('    private\n\n')
@@ -235,7 +349,7 @@ class FortranModule:
                     eval(func_call)
 #                 t.write_type_tools(f,self.indent)
 
-        f.write('end module %s%s\n'%(self.name,S_TYPE_TOOLS))
+        f.write('end module %s\n'%get_type_tool_module(self.name))
 
 
 class FortranUseStatements:
@@ -315,9 +429,9 @@ class FortranType:
         # Misc
         self.indent='    '
 
-    def append(self,line):
+    def append(self,line,comment=''):
         self.raw_lines.append(line)
-        self.Declarations.append(FortranTypeDeclaration(line))
+        self.Declarations.append(FortranTypeDeclaration(line,comment))
 
     def analyse_raw_data(self):
         for d in self.Declarations:
@@ -422,6 +536,7 @@ class FortranType:
         FS.append_corpus('if (associated(X)) then')
         for d in self.Declarations:
             FS.append_corpus(d.get_term('X%'))
+        FS.append_corpus('    deallocate(X)')
         FS.append_corpus('endif')
         FS.write_to_file(f)
 
@@ -526,11 +641,14 @@ class FortranType:
 
 
 class FortranMethod(object):
-    def __init__(self,name):
+    def __init__(self,name='',raw_name=''):
         self.name=name
+        self.raw_name=raw_name
         self.type='method'
+        self.raw_lines=[]
         self.arglist_str=''
         self.arglist_raw=[]
+        self.arglist_name_raw=[]
         self.arglist=[]
         self.varlist_str=''
         self.varlist_raw=[]
@@ -538,6 +656,11 @@ class FortranMethod(object):
         self.corpus=[]
         self.indent='    '
         self.bRecursive=False
+        self.return_type=''
+
+    def append_raw(self,line,comment=''):
+        self.raw_lines.append(line)
+#         self.Declarations.append(FortranDeclaration(line,comment))
 
     def append_corpus(self,corpus):
         self.corpus.append(corpus)
@@ -561,6 +684,106 @@ class FortranMethod(object):
         else:
             self.arglist_str+=','+d['varname']
 
+    def analyse_raw_data(self):
+        # --------------------------------------------------------------------------------
+        # ---  Analysing raw_name
+        # --------------------------------------------------------------------------------
+        words=self.raw_name.lower().split(' ')
+        for (w,i) in zip(words,range(len(words))):
+            if w=='subroutine':
+                self.type='subroutine'
+                break
+            if w=='function':
+                self.type='function'
+                break
+
+        before_method = ' '.join(words[0:i]).strip()
+        after_method  = ' '.join(words[i+1:]).strip()
+        # Joining all, and replacing () with space and splitting
+        after_method=after_method.replace(' ','')
+        after_method2=after_method.replace('(',' ')
+        after_method2=after_method2.replace(')',' ')
+        words=after_method2.split(' ')
+        # Trying to catch a result 
+#         if after_method.find('result(')
+        self.name=words[0]
+        if len(words[1])>0:
+            self.arglist_name_raw=words[1].split(',')
+
+        # --------------------------------------------------------------------------------
+        # ---  
+        # --------------------------------------------------------------------------------
+        ### Detection of result var
+        result_var=''
+        bind_var=''
+        for (w,i) in zip(words,range(len(words))):
+            if w=='result':
+                result_var=words[i+1]
+            if w=='bind':
+                bind_var=words[i+1]
+
+        if bind_var!='':
+            names=bind_var.split('\'')
+            self.name=names[1]
+        # --------------------------------------------------------------------------------
+        # ---  Special care for functions
+        # --------------------------------------------------------------------------------
+            ### Detection of 
+        if self.type=='function':
+            self.return_type=before_method.strip() # More handling required if recursive, pure, elemental, etc..
+        
+        # --------------------------------------------------------------------------------
+        # ---  Analysing Argument, Variables and corpus
+        # --------------------------------------------------------------------------------
+        tmp_arg_list=[];
+        tmp_arg_list_raw=[];
+        for line in self.raw_lines:
+            #print(line)
+            l=line.strip()
+            i_dots=l.find('::')
+            if i_dots>=0:
+                # handling several varaibles declared on one line
+                l_before=l[0:i_dots].strip()
+                l_after =l[i_dots+2:].strip()
+                variables=l_after.split(',') 
+                for var in variables:
+                    l_tmp=l_before+'::'+var
+                    #print(l_tmp)
+                    if l_tmp.find('intent')>=0:
+                        tmp_arg_list.append(FortranDeclaration(l_tmp)) # temporary storing arguments (since maybe not in proper order)
+                        tmp_arg_list_raw.append(l_tmp) # temporary storing arguments (since maybe not in proper order)
+                    else:
+                        self.append_var(l_tmp)
+            else:
+                self.append_corpus(l)
+#             if pattern_intent_in.match(l):
+#             pass
+
+        # --------------------------------------------------------------------------------
+        # --- Sorting argument list 
+        # --------------------------------------------------------------------------------
+#         print(tmp_arg_list)
+#         print(self.arglist_name_raw)
+        #print(self.arglist)
+        if len(tmp_arg_list)!=len(self.arglist_name_raw):
+            print('Error: Arguments in method list and declared do not match for %s! Did you use intent everywhere?'%self.name)
+            sys.exit(-1)
+        else:
+            for arg_name in self.arglist_name_raw:
+                for (d,idecl) in zip(tmp_arg_list,range(len(tmp_arg_list))):
+                    bFound=False
+                    if d['varname'].lower()==arg_name.lower():
+                        self.append_arg(tmp_arg_list_raw[idecl])
+                        bFound=True
+                        break
+                if not bFound:
+                    print('Error: argument %s not found in declaration list of %s '%(arg_name,self.name))
+                    sys.exit(-1)
+
+        # print(self.arglist)
+
+
+
     def setRecusive(self,bRecursive):
         self.bRecursive=bRecursive
 
@@ -568,6 +791,42 @@ class FortranMethod(object):
         self.varlist=[d for d in self.varlist if (any([(d['varname'] in x) for x in self.corpus]))]
 #             for l in self.corpus:
 
+    def write_signature(self,f):
+        f.write('//%s\n'%self.raw_name);
+        if self.type=='subroutine':
+            f.write('void ');
+        else:
+            f.write('%s '%fortran_returntype_to_c(self.return_type));
+
+        f.write('%s('%self.name);
+        for (a,i) in zip(self.arglist,range(len(self.arglist))):
+            C_TYPE=fortran_type_to_c(a['type'])
+            f.write('%s '%C_TYPE);
+            f.write('%s'%a['varname']);
+            if i!= len(self.arglist)-1:
+                f.write(', ');
+
+        f.write(');\n');
+    
+    def write_signature_def(self,f):
+        f.write('%s\n'%self.name.lower());
+
+    def write_def(self,f):
+        f.write('//%s\n'%self.raw_name);
+        if self.type=='subroutine':
+            f.write('void ');
+        else:
+            f.write('%s '%fortran_type_to_c(self.return_type));
+
+        f.write('%s('%self.name);
+        for (a,i) in zip(self.arglist,range(len(self.arglist))):
+            C_TYPE=fortran_type_to_c(a['type'])
+            f.write('%s '%C_TYPE);
+            f.write('%s'%a['varname']);
+            if i!= len(self.arglist):
+                f.write(', ');
+
+        f.write(');\n');
 
     def write_to_file(self,f,indent='    '):
         if self.bRecursive:
@@ -619,7 +878,7 @@ class FortranFunction(FortranMethod):
         self.type='function'
 
 class FortranDeclaration(dict):
-    def __init__(self,l):
+    def __init__(self,l,comment=''):
         super(FortranDeclaration,self).__init__(built_in=True,\
                 type_raw='',\
                 type='',\
@@ -631,11 +890,15 @@ class FortranDeclaration(dict):
                 allocatable=False,\
                 intent='',\
                 varname='',\
-                varvalue='')
+                varvalue='',\
+                comment='',\
+                alias=False)
         self.IsArgument=False
         self.IsTypeDeclaration=False
 
 
+        # Small safety
+        l=l.replace(';','');
         # --------------------------------------------------------------------------------
         # --- Converting declaration line to a dictionary
         # --------------------------------------------------------------------------------
@@ -660,9 +923,9 @@ class FortranDeclaration(dict):
 
 
             self['varname']=vardef.split('=')[0].strip()
-            if attributes_low.find('pointer')>0:
+            if attributes_low.find('pointer')>=0:
                 self['pointer']=True
-            if attributes_low.find('allocatable')>0:
+            if attributes_low.find('allocatable')>=0:
                 self['allocatable']=True
 
             # Trying to catch the value
@@ -688,9 +951,27 @@ class FortranDeclaration(dict):
 
                 self['dimension']=dim_str
                 self['ndimensions']=self['dimension'].count(',')+1
+            
+            # Catching the intent
+            idx=l.find('intent')
+            if idx>=0:
+                intent_str=l[idx:]
+                intent_str=intent_str[intent_str.index('(')+1:intent_str.index(')')]
+                if intent_str.lower().strip()=='in':
+                    self['intent']='in'
+                else:
+                    self['intent']='out'
 
             if self['pointer'] and len(self['varvalue'])==0 and self.IsTypeDeclaration:
                 print('Warning: %s not initialized to null'%(self['varname']))
+
+            # Catching the comment
+            if len(comment)>0:
+                self['comment']=comment
+                if comment.lower().find('alias')>=0:
+                    #print(l+comment)
+                    self['alias']=True
+
         else:
             print('Error, this script assumes definition with ::')
 
@@ -726,9 +1007,12 @@ class FortranDeclaration(dict):
                     term='%s = %s ! reinit - to avoid unused variable message'%(varname,self['varvalue'])
         else:
             if self['pointer']:
-                term='if (associated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+                if not self['alias']:
+                    term='if (associated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+#                 term='if (associated(%s)) then\n    call %s_termp(%s)\n    deallocate(%s)\nendif'%(varname,self['pretty_type'],varname,varname)
             elif self['allocatable']:
                 term='if (allocated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+#                 term='if (allocated(%s)) then\n    call %s_termp(%s)\n    deallocate(%s)\nendif'%(varname,self['pretty_type'],varname,varname)
             else:
                 term='call %s_term(%s)'%(self['pretty_type'],varname)
         return(term)
@@ -744,7 +1028,8 @@ class FortranDeclaration(dict):
                     init='%s = %s'%(varname,self['varvalue'])
         else:
             if self['pointer']:
-                init='call %s_initp(%s)'%(self['pretty_type'],varname)
+                #init='call %s_initp(%s)'%(self['pretty_type'],varname)
+                init='nullify(%s)'%(varname)
             elif self['allocatable']:
                 init='call %s_initp(%s)'%(self['pretty_type'],varname)
             else:
@@ -812,13 +1097,13 @@ class FortranDeclaration(dict):
         return(read)
 
 class FortranArgument(FortranDeclaration):
-    def __init__(self,l):
-        super(FortranArgument,self).__init__(l)
+    def __init__(self,l,comment=''):
+        super(FortranArgument,self).__init__(l,comment)
         self.IsArgument=True
 
 class FortranTypeDeclaration(FortranDeclaration):
-    def __init__(self,l):
-        super(FortranTypeDeclaration,self).__init__(l)
+    def __init__(self,l,comment=''):
+        super(FortranTypeDeclaration,self).__init__(l,comment)
         self.IsTypeDeclaration=True
 
 
