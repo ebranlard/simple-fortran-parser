@@ -1108,7 +1108,10 @@ class FortranDeclaration(dict):
                     read+='    read(iunit)nd%d\n'%(i+1)
                     ns+='nd%d,'%(i+1)
                 ns=ns[:-1]
-                read+='    allocate(%s(%s))\n'%(varname,ns)
+                if self['ndimensions']==0:
+                    read+='    allocate(%s)\n'%(varname)
+                else:
+                    read+='    allocate(%s(%s))\n'%(varname,ns)
                 read+='    read(iunit)%s\n'%varname
                 read+='endif'
             else:
