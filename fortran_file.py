@@ -829,8 +829,6 @@ class FortranMethod(object):
                     else:
                         self.append_var(l_tmp,comment)
 
-                    print(l_tmp+' '+comment)
-
             elif bUseStatement:
                 self.UseStatements.append(l)
                 #print(l)
