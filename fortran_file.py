@@ -396,7 +396,7 @@ class FortranUseStatements:
             d=dict(module='',only_list=[])
             sp=l.split(':')
             if len(sp)>1:
-                d['only_list']=sp[1].strip().split(',')
+                d['only_list']=sp[1].replace(' ','').split(',')
 
             d['module']=sp[0].replace(',',' ').replace('  ',' ').split(' ')[1].strip()
 
@@ -1040,7 +1040,7 @@ class FortranDeclaration(dict):
             elif not self['allocatable']:
                 s=vardef.split('=')
                 if len(s)>1:
-                    self['varvalue']=s[1]
+                    self['varvalue']=s[1].strip()
 
 
             # Catching the dimension
