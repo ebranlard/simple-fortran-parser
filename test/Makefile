@@ -2,6 +2,9 @@ all:test
 	
 test:
 	@./Test.py
+	diff Interface_gen*.f90
+	diff ProfileTypes_gen*.f90
+
 
 clean:
 	@rm -f *.h *.def *AutoTools.f90 *_gen.f90

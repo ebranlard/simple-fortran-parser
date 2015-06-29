@@ -18,6 +18,15 @@ if __name__ == "__main__":
     F.read()
     F.write('ProfileTypes_gen.f90')
     F.write_type_tools('ProfileAutoTools.f90')
+
+    # Regenerating files
+    F=FortranFile('ProfileTypes_gen.f90')
+    F.read()
+    F.write('ProfileTypes_gen_gen.f90')
+
+    F=FortranFile('Interface_gen.f90')
+    F.read()
+    F.write('Interface_gen_gen.f90')
     #F.write()
     #F.write_type_tools()
     #F.write_signatures_def()
