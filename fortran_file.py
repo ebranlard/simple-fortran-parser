@@ -587,25 +587,53 @@ class FortranType:
 
 
     def write_tool_read(self,f,routines):
+        # Writting routine name
         FS=self._getRoutine0o('_read_0')
+        # Arguments
         FS.append_arg('integer, intent(in) :: iunit')
+        # Variables
         FS.append_var('logical :: bPresent')
-        FS.append_var('integer :: nd1')
-        FS.append_var('integer :: nd2')
-        FS.append_var('integer :: nd3')
-        FS.append_var('integer :: nd4')
+        # We need to we get the maximum number of dimensions of variables
+        m=0
+        for d in self.Declarations:
+            if d['pointer'] or d['allocatable']:
+                m=max((d['ndimensions'],m))
+
+        if m>0 :
+            FS.append_var('integer :: nd1')
+        if m>1 :
+            FS.append_var('integer :: nd2')
+        if m>2 :
+            FS.append_var('integer :: nd3')
+        if m>3 :
+            FS.append_var('integer :: nd4')
+        # Reading type
+
         for d in self.Declarations:
             FS.append_corpus(d.get_read('X%'))
         FS.write_to_file(f)
     
     def write_tool_readp(self,f,routines):
+        # Writting routine name
         FS=self._getRoutine0p('_readp_0')
+        # Arguments
         FS.append_arg('integer, intent(in) :: iunit')
+        # Variables
         FS.append_var('logical :: bPresent')
-        FS.append_var('integer :: nd1')
-        FS.append_var('integer :: nd2')
-        FS.append_var('integer :: nd3')
-        FS.append_var('integer :: nd4')
+        # We need to we get the maximum number of dimensions of variables
+        m=0
+        for d in self.Declarations:
+            if d['pointer'] or d['allocatable']:
+                m=max((d['ndimensions'],m))
+
+        if m>0 :
+            FS.append_var('integer :: nd1')
+        if m>1 :
+            FS.append_var('integer :: nd2')
+        if m>2 :
+            FS.append_var('integer :: nd3')
+        if m>3 :
+            FS.append_var('integer :: nd4')
         FS.append_corpus('read(iunit)bPresent')
         FS.append_corpus('if (bPresent) then')
         FS.append_corpus('allocate(X)')
@@ -1080,7 +1108,10 @@ class FortranDeclaration(dict):
                     read+='    read(iunit)nd%d\n'%(i+1)
                     ns+='nd%d,'%(i+1)
                 ns=ns[:-1]
-                read+='    allocate(%s(%s))\n'%(varname,ns)
+                if self['ndimensions']==0:
+                    read+='    allocate(%s)\n'%(varname)
+                else:
+                    read+='    allocate(%s(%s))\n'%(varname,ns)
                 read+='    read(iunit)%s\n'%varname
                 read+='endif'
             else:
