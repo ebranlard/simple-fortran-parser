@@ -4,4 +4,4 @@ test:
 	@./Test.py
 
 clean:
-	@rm -f *.h *.def ProfileAutoTools.f90 Interface_gen.f90
+	@rm -f *.h *.def *AutoTools.f90 *_gen.f90

@@ -13,8 +13,10 @@ if __name__ == "__main__":
     F.write('Inteface_gen.f90')
     F.write_signatures('Interface.h')
     F.write_signatures_def('Interface.def')
+
     F=FortranFile('ProfileTypes.f90')
     F.read()
+    F.write('ProfileTypes_gen.f90')
     F.write_type_tools('ProfileAutoTools.f90')
     #F.write()
     #F.write_type_tools()
