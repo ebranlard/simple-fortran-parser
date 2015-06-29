@@ -11,6 +11,7 @@ contains
         use PrecisionMod
         use OmnivorLink
         implicit none
+        !
         call omnivor_term(); 
     end subroutine
     
@@ -18,7 +19,7 @@ contains
     integer(C_INT) function check() BIND(C,name='check')
         use PrecisionMod, only: C_INT
         use OmnivorErrorState, only: is_omnivor_in_error_state
-        implicit none
+        !
         check=int(1,C_INT)
         if(is_omnivor_in_error_state()) then
             check=int(0,C_INT); 
@@ -29,7 +30,6 @@ contains
     !> Returns 1 if library has no error
     subroutine error_solved() BIND(C,name='error_solved')
         use OmnivorErrorState, only: set_omnivor_error_state
-        implicit none
         call set_omnivor_error_state(.false.)
     end subroutine
 
@@ -37,7 +37,9 @@ contains
     subroutine io_set_output_to_std(flag_c) BIND(C, NAME='io_set_output_to_std')
         use OmnivorIO, only: set_output_to_std
         use PrecisionMod,only:C_INT
-        integer(C_INT),intent(in) :: flag_c   !< 
+        !
+        integer(C_INT),intent(in) :: flag_c   !< 1=output to std
+        !
         call set_output_to_std(flag_c==1)
     end subroutine
 
@@ -54,9 +56,9 @@ contains
         use WindData, only: TurbPart
         use TimeInfoTools, only: set_action_time_var
         use StringUtils,       only: strsplit, T_SubStrings, substr_term
-        implicit none
-        character(kind=C_CHAR,len=1),dimension(*),intent(in) :: svar_c !< variable, c string
-        real(C_DOUBLE),intent(in)              :: rval   !< 
+        character(kind=C_CHAR,len=1),dimension(*),intent(in) :: svar_c !< variable name
+        real(C_DOUBLE),intent(in)              :: rval   !< variable value
+        !
         character(64)                        :: svar   !< fortran string
 
         type(T_SubStrings) :: SubStrings
@@ -95,7 +97,6 @@ contains
     integer(C_INT) function it_IncrementTime() BIND(C,name='it_incrementtime')
         use PrecisionMod, only: C_INT
         use TimeManager
-        implicit none
         it_IncrementTime=0;
         if(IncrementTime()) it_IncrementTime=1;
     end function
@@ -105,7 +106,6 @@ contains
         use PrecisionMod, only: MK, C_DOUBLE
         use TimeManager
         use OmnivorData
-        implicit none
         real(C_DOUBLE),intent(in) :: t_max_in;
         call setTmax(real(t_max_in,MK))
         call settmax_omnivor(real(t_max_in,MK))
@@ -120,7 +120,6 @@ contains
     integer(C_INT) function it_getntmax() BIND(C,name='it_getntmax')
         use PrecisionMod, only: C_INT
         use TimeManager
-        implicit none
         it_getntmax=int(getntmax(),C_INT);
     end function
 

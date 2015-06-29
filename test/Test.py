@@ -10,7 +10,7 @@ from fortran_file import*
 if __name__ == "__main__":
     F=FortranFile('Interface.f90')
     F.read()
-    F.write('Inteface_gen.f90')
+    F.write('Interface_gen.f90')
     F.write_signatures('Interface.h')
     F.write_signatures_def('Interface.def')
 
