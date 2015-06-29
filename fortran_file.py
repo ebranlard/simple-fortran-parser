@@ -773,7 +773,7 @@ class FortranMethod(object):
             self.arglist_name_raw=words[1].split(',')
 
         # --------------------------------------------------------------------------------
-        # ---  Things after signature (i.e. bind and result)
+        # ---  Things after signature (i.e. bind and result) NASTY
         # --------------------------------------------------------------------------------
         self.result_name=''
         self.bind_name=''
@@ -923,10 +923,10 @@ class FortranMethod(object):
         if self.bRecursive:
             goodies_before='recursive '
         else:
-            if len('self.result_name')>0:
-                   goodies_after=' result(%s)'%self.result_name
-            if len('self.bind_name')>0:
-                   goodies_after=' BIND(C, name=\'%s\')'%self.bind_name
+            if len('self.result_name')>0 and self.result_name!='':
+                   goodies_after+=' result(%s)'%self.result_name
+            if len('self.bind_name')>0 and self.bind_name!='':
+                   goodies_after+=' BIND(C, name=\'%s\')'%self.bind_name
 
         f.write('%s%s%s %s(%s)%s\n'%(indent,goodies_before,self.type,self.name,self.arglist_str,goodies_after))
 
