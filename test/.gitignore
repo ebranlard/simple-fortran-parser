@@ -1,4 +1,4 @@
-Inteface_gen.f90
-Interface.h
-Interface.def
+*_gen.f90
+*.h
+*.def
 ProfileAutoTools.f90
