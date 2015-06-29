@@ -8,6 +8,17 @@
 # Dependencies : python
 # License : Feel free to modify and adapt it
 #############################################################
+
+# --------------------------------------------------------------------------------
+# --- Notes 
+# --------------------------------------------------------------------------------
+# - Declarations are detected with "::"
+# - Comments are actually stripped out for now (see remove_comments)... I think it made long line merging easier
+
+
+# --------------------------------------------------------------------------------
+# ---  
+# --------------------------------------------------------------------------------
 from fortran_parse_tools import*
 from fortran_to_c import*
 import sys 
@@ -61,7 +72,8 @@ class FortranFile:
             (L,comments) = remove_comments(L);
 
             # --------------------------------------------------------------------------------
-            # --- Extracting Modules, types and Use Statements
+            # --- Extracting Modules, types and Use Statements,
+            #  really nasty I should have extracted modules only and then pass it around...
             # --------------------------------------------------------------------------------
             self.ModuleList=[]
             bIsInType=False
@@ -110,7 +122,11 @@ class FortranFile:
                         else:
                             print('Error, subroutines not inmodules not handled yet')
                     elif words[0].lower()=='use':
-                        m.UseStatements.append(l)
+                        if not bIsInMethod :
+                            m.UseStatements.append(l)
+                        else:
+                            s.append_raw(l,c)
+
                     elif words[0].lower()=='type':
                         if not bIsInMethod:
                             # Creating a new type
@@ -200,7 +216,7 @@ class FortranModule:
         self.name=name
 
         # UseStatement
-        self.UseStatements=FortranUseStatements()
+        self.UseStatements=FortranUseStatements(line=[])
         # Types
         self.TypeList=[]
         self.type_dependencies=[]
@@ -213,6 +229,8 @@ class FortranModule:
         self.indent='    '
 
     def analyse_raw_data(self):
+        self.UseStatements=FortranUseStatements(line=[])
+        # Types
         #print('MODULE: '+self.name)
 
         # --------------------------------------------------------------------------------
@@ -277,10 +295,17 @@ class FortranModule:
 
     def write_to_file(self,f):
         f.write('module %s\n'%self.name)
+        # Use statements
         self.UseStatements.write_to_file(f,'')
+        f.write('%simplicit none\n'%self.indent)
+        # Types
         for t in self.TypeList:
             t.write_to_file(f,self.indent)
-
+        f.write('\n')
+        # Subroutines 
+        f.write('contains\n')
+        for m in self.MethodList:
+            m.write_to_file(f,self.indent)
         f.write('end module %s\n'%self.name)
 
     def write_signatures(self,f):
@@ -354,20 +379,20 @@ class FortranModule:
 
 class FortranUseStatements:
 
-    # static data
-    default_dict_=dict(module='',only_list=[])
 
     def __init__(self,line=[]):
         self.raw_lines=line
         self.statements=[]
         self.indent='    '
+        # static data
 
     def append(self,line):
         self.raw_lines.append(line)
 
     def analyse_raw_data(self):
         for l in self.raw_lines:
-            d=self.default_dict_.copy()
+            #d=self.default_dict_.copy()
+            d=dict(module='',only_list=[])
             sp=l.split(':')
             if len(sp)>1:
                 d['only_list']=sp[1].strip().split(',')
@@ -411,8 +436,6 @@ class FortranUseStatements:
 
 
 class FortranType:
-
-    default_dict_=dict(built_in=True,type_raw='',type='',dimension_fixed=False,dimension='',pointer=False,allocatable=False,varname='',varvalue='')
 
     def __init__(self,name):
         # Raw data
@@ -670,9 +693,14 @@ class FortranType:
 
 class FortranMethod(object):
     def __init__(self,name='',raw_name=''):
+        # A bit of a mess between name, raw_name and bind_name. I guess name and bind_name are the same.. I should get rid of raw_name. But replacement needs care for signature (C etc..)
         self.name=name
         self.raw_name=raw_name
+        self.bind_name=''
+        #
+        self.result_name=''
         self.type='method'
+        #
         self.raw_lines=[]
         self.arglist_str=''
         self.arglist_raw=[]
@@ -685,6 +713,8 @@ class FortranMethod(object):
         self.indent='    '
         self.bRecursive=False
         self.return_type=''
+        # UseStatement
+        self.UseStatements=FortranUseStatements(line=[])
 
     def append_raw(self,line,comment=''):
         self.raw_lines.append(line)
@@ -713,6 +743,7 @@ class FortranMethod(object):
             self.arglist_str+=','+d['varname']
 
     def analyse_raw_data(self):
+        self.UseStatements=FortranUseStatements(line=[])
         # --------------------------------------------------------------------------------
         # ---  Analysing raw_name
         # --------------------------------------------------------------------------------
@@ -739,19 +770,24 @@ class FortranMethod(object):
             self.arglist_name_raw=words[1].split(',')
 
         # --------------------------------------------------------------------------------
-        # ---  
+        # ---  Things after signature (i.e. bind and result)
         # --------------------------------------------------------------------------------
-        ### Detection of result var
-        result_var=''
+        self.result_name=''
+        self.bind_name=''
+        ### Trying to read bind and result
         bind_var=''
         for (w,i) in zip(words,range(len(words))):
             if w=='result':
-                result_var=words[i+1]
+                self.result_name=words[i+1]
             if w=='bind':
                 bind_var=words[i+1]
 
+        # Extracting bind name from bind words
         if bind_var!='':
+            # WATCH OUT THIS IS NOT GENERAL!!!! is assumes a form: BIND(C,name='bind_name')
             names=bind_var.split('\'')
+            self.bind_name=names[1]
+            # Hmm... This below seems like a hack: overriding method name by bind name.. I guessed I used that for the signatures. Signatures should now use bind_name instead...
             self.name=names[1]
         # --------------------------------------------------------------------------------
         # ---  Special care for functions
@@ -761,15 +797,20 @@ class FortranMethod(object):
             self.return_type=before_method.strip() # More handling required if recursive, pure, elemental, etc..
         
         # --------------------------------------------------------------------------------
-        # ---  Analysing Argument, Variables and corpus
+        # ---  Analysing Use Statements, Argument, Variables and corpus
         # --------------------------------------------------------------------------------
         tmp_arg_list=[];
         tmp_arg_list_raw=[];
         for line in self.raw_lines:
             #print(line)
             l=line.strip()
-            i_dots=l.find('::')
-            if i_dots>=0:
+            words=l.split(' ')
+            # Detecting declaration
+            i_dots=l.find('::');
+            bDeclaration=i_dots>0
+            # Detecting Use statement
+            bUseStatement=words[0].lower()=='use'
+            if bDeclaration:
                 # handling several varaibles declared on one line
                 l_before=l[0:i_dots].strip()
                 l_after =l[i_dots+2:].strip()
@@ -782,6 +823,9 @@ class FortranMethod(object):
                         tmp_arg_list_raw.append(l_tmp) # temporary storing arguments (since maybe not in proper order)
                     else:
                         self.append_var(l_tmp)
+            elif bUseStatement:
+                self.UseStatements.append(l)
+                #print(l)
             else:
                 self.append_corpus(l)
 #             if pattern_intent_in.match(l):
@@ -810,6 +854,10 @@ class FortranMethod(object):
 
         # print(self.arglist)
 
+        # --------------------------------------------------------------------------------
+        # ---  Analysing use statements
+        # --------------------------------------------------------------------------------
+        self.UseStatements.analyse_raw_data()
 
 
     def setRecusive(self,bRecursive):
@@ -819,14 +867,17 @@ class FortranMethod(object):
         self.varlist=[d for d in self.varlist if (any([(d['varname'] in x) for x in self.corpus]))]
 #             for l in self.corpus:
 
+    # Writting C signature equivalent to the current fortran method
     def write_signature(self,f):
+        # 
         f.write('//%s\n'%self.raw_name);
         if self.type=='subroutine':
             f.write('void ');
         else:
             f.write('%s '%fortran_returntype_to_c(self.return_type));
 
-        f.write('%s('%self.name);
+        # We use the bind_name for C signature
+        f.write('%s('%self.bind_name);
         for (a,i) in zip(self.arglist,range(len(self.arglist))):
             C_TYPE=fortran_type_to_c(a['type'])
             f.write('%s '%C_TYPE);
@@ -837,34 +888,52 @@ class FortranMethod(object):
         f.write(');\n');
     
     def write_signature_def(self,f):
-        f.write('%s\n'%self.name.lower());
+        # We use the bind_name
+        f.write('%s\n'%self.bind_name.lower());
 
-    def write_def(self,f):
-        f.write('//%s\n'%self.raw_name);
-        if self.type=='subroutine':
-            f.write('void ');
-        else:
-            f.write('%s '%fortran_type_to_c(self.return_type));
-
-        f.write('%s('%self.name);
-        for (a,i) in zip(self.arglist,range(len(self.arglist))):
-            C_TYPE=fortran_type_to_c(a['type'])
-            f.write('%s '%C_TYPE);
-            f.write('%s'%a['varname']);
-            if i!= len(self.arglist):
-                f.write(', ');
-
-        f.write(');\n');
+#     def write_def(self,f):
+#         f.write('//%s\n'%self.raw_name);
+#         if self.type=='subroutine':
+#             f.write('void ');
+#         else:
+#             f.write('%s '%fortran_type_to_c(self.return_type));
+# 
+#         f.write('%s('%self.name);
+#         for (a,i) in zip(self.arglist,range(len(self.arglist))):
+#             C_TYPE=fortran_type_to_c(a['type'])
+#             f.write('%s '%C_TYPE);
+#             f.write('%s'%a['varname']);
+#             if i!= len(self.arglist):
+#                 f.write(', ');
+# 
+#         f.write(');\n');
 
     def write_to_file(self,f,indent='    '):
+        # --------------------------------------------------------------------------------
+        # --- Writting the fortran signature of the method
+        # --------------------------------------------------------------------------------
+        goodies_before=''
+        goodies_after=''
         if self.bRecursive:
-            f.write('%srecursive %s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
+            goodies_before='recursive '
         else:
-            f.write('%s%s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
+            if len('self.result_name')>0:
+                   goodies_after=' result(%s)'%self.result_name
+            if len('self.bind_name')>0:
+                   goodies_after=' BIND(C, name=\'%s\')'%self.bind_name
 
+        f.write('%s%s%s %s(%s)%s\n'%(indent,goodies_before,self.type,self.name,self.arglist_str,goodies_after))
+
+        # --------------------------------------------------------------------------------
+        # ---  Use statements
+        # --------------------------------------------------------------------------------
+        self.UseStatements.write_to_file(f,self.indent)
+
+        # --------------------------------------------------------------------------------
+        # ---  Arguments and varaible declaration
+        # --------------------------------------------------------------------------------
         # deleting unused variables
         self.remove_unused_var()
-
 
         if len(self.arglist)>0:
             f.write('%s! Arguments declaration\n'%(indent+self.indent))
@@ -882,7 +951,8 @@ class FortranMethod(object):
                 if len(l)>0:
                     for ll in l.split('\n'):
                         f.write('%s%s\n'%(indent+self.indent,ll))
-        f.write('%send %s %s\n\n'%(indent,self.type,self.name))
+        #f.write('%send %s %s\n\n'%(indent,self.type,self.name))
+        f.write('%send %s\n\n'%(indent,self.type))
 
     # A kind of hack
     def write_to_file_inout(self,f,indent='    '):
@@ -1010,6 +1080,8 @@ class FortranDeclaration(dict):
             attributes+=', dimension(%s)'%self['dimension']
         if self['pointer']:
             attributes+=', pointer'
+        if len(self['intent']):
+            attributes+=', intent(%s)'%self['intent']
         if self['allocatable']:
             attributes+=', allocatable'
         attributes+=' :: '+self['varname']
@@ -1019,6 +1091,10 @@ class FortranDeclaration(dict):
             else:
                 attributes+=' = '
             attributes+=self['varvalue']
+
+        if len(self['comment'])>0:
+            attributes+='!< '+self['comment']
+
         f.write('%s%s\n'%(indent,attributes))
 
     def get_term(self,preffix=''):
