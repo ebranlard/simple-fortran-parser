@@ -13,7 +13,7 @@
 # --- Notes 
 # --------------------------------------------------------------------------------
 # - Declarations are detected with "::"
-# - Comments are actually stripped out for now (see remove_comments)... I think it made long line merging easier
+# - Comments might be messed up due to long line merging. see remove_comments 
 
 
 # --------------------------------------------------------------------------------
@@ -229,7 +229,6 @@ class FortranModule:
         self.indent='    '
 
     def analyse_raw_data(self):
-        self.UseStatements=FortranUseStatements(line=[])
         # Types
         #print('MODULE: '+self.name)
 
@@ -303,9 +302,11 @@ class FortranModule:
             t.write_to_file(f,self.indent)
         f.write('\n')
         # Subroutines 
-        f.write('contains\n')
-        for m in self.MethodList:
-            m.write_to_file(f,self.indent)
+
+        if len(self.MethodList)>0:
+            f.write('contains\n')
+            for m in self.MethodList:
+                m.write_to_file(f,self.indent)
         f.write('end module %s\n'%self.name)
 
     def write_signatures(self,f):
@@ -702,6 +703,7 @@ class FortranMethod(object):
         self.type='method'
         #
         self.raw_lines=[]
+        self.raw_comment_lines=[] 
         self.arglist_str=''
         self.arglist_raw=[]
         self.arglist_name_raw=[]
@@ -718,14 +720,15 @@ class FortranMethod(object):
 
     def append_raw(self,line,comment=''):
         self.raw_lines.append(line)
+        self.raw_comment_lines.append(comment)
 #         self.Declarations.append(FortranDeclaration(line,comment))
 
     def append_corpus(self,corpus):
         self.corpus.append(corpus)
 
-    def append_var(self,var):
+    def append_var(self,var,comment=''):
         self.varlist_raw.append(var)
-        d=FortranDeclaration(var)
+        d=FortranDeclaration(var,comment)
         self.varlist.append(d)
         if len(self.varlist_str)==0:
             self.varlist_str=d['varname']
@@ -733,9 +736,9 @@ class FortranMethod(object):
             self.varlist_str+=','+d['varname']
 
 
-    def append_arg(self,arg):
+    def append_arg(self,arg,comment=''):
         self.arglist_raw.append(arg)
-        d=FortranArgument(arg)
+        d=FortranArgument(arg,comment)
         self.arglist.append(d)
         if len(self.arglist_str)==0:
             self.arglist_str=d['varname']
@@ -801,7 +804,8 @@ class FortranMethod(object):
         # --------------------------------------------------------------------------------
         tmp_arg_list=[];
         tmp_arg_list_raw=[];
-        for line in self.raw_lines:
+        tmp_arg_list_raw_comment=[];
+        for (line,comment) in zip(self.raw_lines,self.raw_comment_lines):
             #print(line)
             l=line.strip()
             words=l.split(' ')
@@ -819,10 +823,14 @@ class FortranMethod(object):
                     l_tmp=l_before+'::'+var
                     #print(l_tmp)
                     if l_tmp.find('intent')>=0:
-                        tmp_arg_list.append(FortranDeclaration(l_tmp)) # temporary storing arguments (since maybe not in proper order)
+                        tmp_arg_list.append(FortranDeclaration(l_tmp,comment)) # temporary storing arguments (since maybe not in proper order)
                         tmp_arg_list_raw.append(l_tmp) # temporary storing arguments (since maybe not in proper order)
+                        tmp_arg_list_raw_comment.append(comment) # temporary storing arguments (since maybe not in proper order)
                     else:
-                        self.append_var(l_tmp)
+                        self.append_var(l_tmp,comment)
+
+                    print(l_tmp+' '+comment)
+
             elif bUseStatement:
                 self.UseStatements.append(l)
                 #print(l)
@@ -845,7 +853,7 @@ class FortranMethod(object):
                 for (d,idecl) in zip(tmp_arg_list,range(len(tmp_arg_list))):
                     bFound=False
                     if d['varname'].lower()==arg_name.lower():
-                        self.append_arg(tmp_arg_list_raw[idecl])
+                        self.append_arg(tmp_arg_list_raw[idecl], tmp_arg_list_raw_comment[idecl])
                         bFound=True
                         break
                 if not bFound:
@@ -1093,7 +1101,7 @@ class FortranDeclaration(dict):
             attributes+=self['varvalue']
 
         if len(self['comment'])>0:
-            attributes+='!< '+self['comment']
+            attributes+=' '+self['comment']
 
         f.write('%s%s\n'%(indent,attributes))
 
