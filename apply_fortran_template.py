@@ -5,7 +5,7 @@
 # ---  PARAMS
 # --------------------------------------------------------------------------------
 Types=['integer','double precision','real','logical']
-Dims =[0,1]
+Dims =[1,0]
 
 
 
@@ -23,8 +23,8 @@ else:
     Files=glob.glob('*.Template')
 
 
-print('Template files:')
-print(Files)
+# print('Template files:')
+# print(Files)
 
 if len(Files)>0:
 
@@ -40,15 +40,19 @@ if len(Files)>0:
             if dim==0:
                 TYPE_AND_DIM=typ
             else:
-                TYPE_AND_DIM=typ+', dimension(:)'
-                #
-                with open(Files[0],'r') as fr:
-                    with open(filename,'w') as fw:
-                        for l in fr.readlines():
-                            l=l.replace('<TD>',TD)
-                            l=l.replace('<td>',td)
-                            l=l.replace('<TYPE_AND_DIM>',TYPE_AND_DIM)
-                            fw.write(l)
+                TYPE_AND_DIM=typ+', dimension(n1)'
+            #
+            fr=open(Files[0],'r')
+            fw=open(filename,'w')
+            for l in fr.readlines():
+                l=l.replace('<TD>',TD)
+                l=l.replace('<N1>','n1')
+                l=l.replace('<td>',td)
+                l=l.replace('<TYPE_AND_DIM>',TYPE_AND_DIM)
+                fw.write(l)
+            fw.close()
+            fr.close()
+
 
 
 
