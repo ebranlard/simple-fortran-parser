@@ -1120,6 +1120,8 @@ class FortranDeclaration(dict):
             if self['pointer']:
                 if not self['alias']:
                     term='if (associated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
+                else:
+                    term='nullify(%s)'%varname
 #                 term='if (associated(%s)) then\n    call %s_termp(%s)\n    deallocate(%s)\nendif'%(varname,self['pretty_type'],varname,varname)
             elif self['allocatable']:
                 term='if (allocated(%s)) call %s_termp(%s)'%(varname,self['pretty_type'],varname)
