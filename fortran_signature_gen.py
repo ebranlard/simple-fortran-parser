@@ -12,7 +12,6 @@ from __future__ import print_function
 import os, re
 from fortran_file import*
 import sys
-import argparse
 
 
 
@@ -28,11 +27,22 @@ DESCRIPTION="""Description:
 
 def main(argv):
     # Configure argument parser
-    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
-    parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-    parser.add_argument('files', nargs='+', help='List of files')
-    args = parser.parse_args(argv)
-    files=args.files
+    try:
+        import argparse
+        bHasArgParse=True
+    except Exception:
+        bHasArgParse=False
+
+    if bHasArgParse:
+        parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
+        parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+        parser.add_argument('files', nargs='+', help='List of files')
+        args = parser.parse_args(argv)
+        files=args.files
+    else:
+        files=argv
+    
+
 
     # Looping on files and processing them
     for filename in files:
