@@ -95,8 +95,7 @@ class FortranFile:
                     if l[0:4].lower()=='end ':
                         l='end'+l[4:]
 
-                    words=l.replace('  ',' ')
-                    words=l.split(' ')
+                    words=l.replace('  ',' ').split(' ')
                     words_low=l.lower().split(' ')
                     if words[0].lower()=='module':
                         # This is a new module
