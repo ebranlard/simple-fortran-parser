@@ -51,7 +51,7 @@ contains
         use OmnivorIO, only: bdebug_set_triggers
         use PrecisionMod,only:MK, C_DOUBLE, C_CHAR
         use MatlabFunctions,only: num2str
-        use TimeManager,only: setdt,settmax
+        use TimeTools,only: setdt,settmax
         use OmnivorData ! The variables we will change are in this module
         use WindData, only: TurbPart
         use TimeInfoTools, only: set_action_time_var
@@ -94,33 +94,33 @@ contains
     end subroutine
 
     !> Uses dt to increment time, returns 1 if time is successfully incremented
-    integer(C_INT) function it_IncrementTime() BIND(C,name='it_incrementtime')
+    integer(C_INT) function it_time_increment() BIND(C,name='it_incrementtime')
         use PrecisionMod, only: C_INT
-        use TimeManager
-        it_IncrementTime=0;
-        if(IncrementTime()) it_IncrementTime=1;
+        use TimeTools
+        it_time_increment=0;
+        if(time_increment()) it_IncrementTime=1;
     end function
 
     !!! Mutator Functions
     subroutine it_setTmax(t_max_in) BIND(C,name='it_setTmax')
         use PrecisionMod, only: MK, C_DOUBLE
-        use TimeManager
+        use TimeTools
         use OmnivorData
         real(C_DOUBLE),intent(in) :: t_max_in;
         call setTmax(real(t_max_in,MK))
         call settmax_omnivor(real(t_max_in,MK))
     end subroutine
 
-    real(C_DOUBLE) function it_getDt() BIND(C,name='it_getdt')
+    real(C_DOUBLE) function it_Time%dt BIND(C,name='it_getdt')
         use PrecisionMod, only: C_DOUBLE
-        use TimeManager
-        it_getdt=real(getdt(), C_DOUBLE);
+        use TimeTools
+        it_getdt=real(Time%dt, C_DOUBLE);
     end function
 
-    integer(C_INT) function it_getntmax() BIND(C,name='it_getntmax')
+    integer(C_INT) function it_Time%ntmax BIND(C,name='it_getntmax')
         use PrecisionMod, only: C_INT
-        use TimeManager
-        it_getntmax=int(getntmax(),C_INT);
+        use TimeTools
+        it_getntmax=int(Time%ntmax,C_INT);
     end function
 
     !> Returns the size of the polar

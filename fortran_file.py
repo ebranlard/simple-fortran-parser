@@ -712,13 +712,14 @@ class FortranType:
             # Use Statements
             FS.UseStatements.append('use StringUtils, only: strsplit, T_SubStrings, substr_term')
             FS.UseStatements.append('use Logging, only: log_info, log_error')
+            FS.UseStatements.append('use MainIOData, only: bDEBUG')
             FS.UseStatements.analyse_raw_data()
             # Arguments
             FS.append_arg('character(len=*), intent(in) :: svar')
             FS.append_arg('character(len=*), intent(in) :: sval')
             # Variables
             FS.append_var('type(T_SubStrings) :: SubStrings')
-            FS.append_corpus("call log_info('Setting variable '//trim(svar)//' to '//trim(sval))")
+            FS.append_corpus("if(bDEBUG) call log_info('Setting variable '//trim(svar)//' to '//trim(sval))")
             FS.append_corpus("call strsplit(trim(svar),SubStrings,'%',1)")
 
             #select case(SubStrings%s(1))
@@ -729,8 +730,9 @@ class FortranType:
                 dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
                 dsp =d['varname'].ljust(MAX_VAR_LENGTH)
                 #
-                if d['type']=='character':
-                    FS.append_corpus("case(); X%%%s = svar"%(dqsp,dsp))
+                #print("%s %s"%(dqsp, d['type']))
+                if d['type'].find('character')==0:
+                    FS.append_corpus("case(%s); X%%%s = trim(svar)"%(dqsp,dsp))
                 else:
                     # For derived types, we only accept "inputs" types
                     if (not d['built_in']):
@@ -760,6 +762,7 @@ class FortranType:
             FS.UseStatements.append('use StringUtils, only: strsplit, T_SubStrings, substr_term')
             FS.UseStatements.append('use Num2StrMod, only: num2str')
             FS.UseStatements.append('use Logging, only: log_info, log_error')
+            FS.UseStatements.append('use MainIOData, only: bDEBUG')
             FS.UseStatements.analyse_raw_data()
             # Arguments
             FS.append_arg('character(len=*), intent(in) :: svar')
@@ -768,7 +771,7 @@ class FortranType:
             #FS.append_var('real(MK) :: rval')
             FS.append_var('type(T_SubStrings) :: SubStrings')
             FS.append_corpus("call strsplit(trim(svar),SubStrings,'%',1)")
-            FS.append_corpus("call log_info('Setting variable '//trim(svar)//' to '//num2str(rvec))")
+            FS.append_corpus("if(bDEBUG) call log_info('Setting variable '//trim(svar)//' to '//num2str(rvec))")
 
             #select case(SubStrings%s(1))
             FS.append_corpus("select case (SubStrings%s(1))")
