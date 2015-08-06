@@ -732,7 +732,7 @@ class FortranType:
                 #
                 #print("%s %s"%(dqsp, d['type']))
                 if d['type'].find('character')==0:
-                    FS.append_corpus("case(%s); X%%%s = trim(svar)"%(dqsp,dsp))
+                    FS.append_corpus("case(%s); X%%%s = trim(sval)"%(dqsp,dsp))
                 else:
                     # For derived types, we only accept "inputs" types
                     if (not d['built_in']):
