@@ -204,8 +204,8 @@ class FortranFile:
                 if m.name[0:9]=='Interface':
                     libname=m.name[9:];
                     libname=libname.lower()
-            f.write('LIBRARY lib%s.dll\n'%libname)
-            f.write('EXPORTS\n')
+            #f.write('LIBRARY lib%s.dll\n'%libname)
+            #f.write('EXPORTS\n')
             m.write_signatures_def(f)
         if f is not sys.stdout:
             f.close()
@@ -315,11 +315,13 @@ class FortranModule:
     def write_signatures(self,f):
         f.write('//Signatures from Module %s\n'%self.name)
         for s in self.MethodList:
-            s.write_signature(f)
+            if(s.bind_name!=''):
+                s.write_signature(f)
 
     def write_signatures_def(self,f):
         for s in self.MethodList:
-            s.write_signature_def(f)
+            if(s.bind_name!=''):
+                s.write_signature_def(f)
 
     def write_type_tools(self,f):
         f.write('module %s\n'%get_type_tool_module(self.name))

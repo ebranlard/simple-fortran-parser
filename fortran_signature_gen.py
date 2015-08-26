@@ -44,10 +44,14 @@ def main(argv):
     
 
 
-    # Looping on files and processing them
-    for filename in files:
-#         process_file(filename,'STDOUT')
-        process_file(filename,'')
+    # We loop on files, process them.
+    if files[0].strip() == '-':
+        files=files[1:]
+        for filename in files:
+            process_file(filename,'STDOUT')
+    else:
+        for filename in files:
+            process_file(filename,'')
 
 def process_file(filename,filename_out):
     with open(filename,'r') as f:

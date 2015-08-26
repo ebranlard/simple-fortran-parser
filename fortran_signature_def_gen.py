@@ -42,8 +42,13 @@ def main(argv):
         files=argv
 
     # Looping on files and processing them
-    for filename in files:
-#         process_file(filename,'STDOUT')
+    if files[0].strip() == '-':
+        files=files[1:]
+        for filename in files:
+            process_file(filename,'STDOUT')
+    else:
+        for filename in files:
+            process_file(filename,'')
         process_file(filename,'')
 
 def process_file(filename,filename_out):
