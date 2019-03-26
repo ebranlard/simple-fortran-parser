@@ -27,19 +27,11 @@ DESCRIPTION="""Description:
 
 def main(argv):
     # Configure argument parser
-    try:
-        import argparse
-        bHasArgParse=True
-    except Exception:
-        bHasArgParse=False
-    if bHasArgParse:
-        parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
-        parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-        parser.add_argument('files', nargs='+', help='List of files')
-        args = parser.parse_args(argv)
-        files=args.files
-    else:
-        files=argv
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
+    parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+    parser.add_argument('files', nargs='+', help='List of files')
+    args = parser.parse_args(argv)
+    files=args.files
 
     # Looping on files and processing them
     if files[0].strip() == '-':
