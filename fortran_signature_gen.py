@@ -12,6 +12,7 @@ from __future__ import print_function
 import os, re
 from fortran_file import*
 import sys
+import argparse
 
 
 
@@ -27,37 +28,33 @@ DESCRIPTION="""Description:
 
 def main(argv):
     # Configure argument parser
-    try:
-        import argparse
-        bHasArgParse=True
-    except Exception:
-        bHasArgParse=False
-
-    if bHasArgParse:
-        parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
-        parser.add_argument('--version', action='version', version='%(prog)s 1.0')
-        parser.add_argument('files', nargs='+', help='List of files')
-        args = parser.parse_args(argv)
-        files=args.files
-    else:
-        files=argv
-    
-
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,description=DESCRIPTION)
+    parser.add_argument('--version', action='version', version='%(prog)s 1.0')
+    parser.add_argument('--stdout' , action ='store_true' )
+    parser.add_argument('--verbose', action ='store_true' )
+    parser.add_argument('files', nargs='+', help='List of files')
+    opts = parser.parse_args(argv)
+    files=opts.files
+    print(opts)
 
     # We loop on files, process them.
-    if files[0].strip() == '-':
+    if (files[0].strip()=='-'):
         files=files[1:]
-        for filename in files:
-            process_file(filename,'STDOUT')
+        out='STDOUT'
+    elif (opts.stdout):
+        out='STDOUT'
     else:
-        for filename in files:
-            process_file(filename,'')
+        out=''
+    for filename in files:
+        process_file(filename,out, opts.verbose)
 
-def process_file(filename,filename_out):
+
+def process_file(filename,filename_out,verbose=False):
     with open(filename,'r') as f:
         f=FortranFile(filename);
         f.read()
-        f.write_signatures(filename_out)
+        f.write_signatures(filename_out,verbose=verbose)
+
 
 
 if __name__ == "__main__":

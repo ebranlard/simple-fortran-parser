@@ -23,6 +23,7 @@ from fortran_parse_tools import*
 from fortran_to_c import*
 import sys 
 import re
+import os
 
 
 # The routines of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
@@ -49,7 +50,6 @@ TOOLS_INPUT=[
 # --------------------------------------------------------------------------------
 S_TYPE_TOOLS='AutoTools'
 def get_type_tool_filename(filename):
-    import os
     (filebase,extension)=os.path.splitext(filename)
     filename_out=filebase.replace('Types','')+S_TYPE_TOOLS+extension
     return(filename_out)
@@ -154,7 +154,6 @@ class FortranFile:
 #                         print(l)
 
     def write(self,filename_out=''):
-        import os
         if filename_out=='':
             (filebase,extension)=os.path.splitext(self.filename)
             filename_out=filebase+'_gen'+extension
@@ -163,7 +162,6 @@ class FortranFile:
                 m.write_to_file(f)
 
     def write_type_tools(self,filename_out=''):
-        import os
         if filename_out=='':
             filename_out=get_type_tool_filename(filename)
         with open(filename_out,'w') as f:
@@ -171,23 +169,23 @@ class FortranFile:
                 m.write_type_tools(f)
 
 
-    def write_signatures(self,filename_out=''):
-        import os
+    def write_signatures(self,filename_out='',verbose=False):
         if filename_out=='':
             (filebase,extension)=os.path.splitext(self.filename)
             filename_out=filebase+'.h'
-        if filename_out=='STDOUT':
+        elif filename_out=='STDOUT':
             f=sys.stdout
         else:
             f=open(filename_out,'w')
+        if verbose:
+            f.write('// --- Signatures from file: '+self.filename+'\n')
         for m in self.ModuleList:
-            m.write_signatures(f)
+            m.write_signatures(f,verbose)
         if f is not sys.stdout:
             f.close()
 
 
     def write_signatures_def(self,filename_out=''):
-        import os
         if filename_out=='':
             (filebase,extension)=os.path.splitext(self.filename)
             filename_out=filebase+'.def'
@@ -312,11 +310,12 @@ class FortranModule:
                 m.write_to_file(f,self.indent)
         f.write('end module %s\n'%self.name)
 
-    def write_signatures(self,f):
-        f.write('//Signatures from Module %s\n'%self.name)
+    def write_signatures(self,f,verbose=False):
+        if verbose:
+            f.write('// Signatures from module %s\n'%self.name)
         for s in self.MethodList:
             if(s.bind_name!=''):
-                s.write_signature(f)
+                s.write_signature(f,verbose)
 
     def write_signatures_def(self,f):
         for s in self.MethodList:
@@ -1000,9 +999,10 @@ class FortranMethod(object):
 #             for l in self.corpus:
 
     # Writting C signature equivalent to the current fortran method
-    def write_signature(self,f):
+    def write_signature(self,f,verbose=False):
         # 
-        f.write('//%s\n'%self.raw_name);
+        if verbose:
+            f.write('//%s\n'%self.raw_name);
         if self.type=='subroutine':
             f.write('void ');
         else:

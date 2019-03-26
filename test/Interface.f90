@@ -111,13 +111,13 @@ contains
         call settmax_omnivor(real(t_max_in,MK))
     end subroutine
 
-    real(C_DOUBLE) function it_Time%dt BIND(C,name='it_getdt')
+    real(C_DOUBLE) function it_Time%dt() BIND(C,name='it_getdt')
         use PrecisionMod, only: C_DOUBLE
         use TimeTools
         it_getdt=real(Time%dt, C_DOUBLE);
     end function
 
-    integer(C_INT) function it_Time%ntmax BIND(C,name='it_getntmax')
+    integer(C_INT) function it_Time%ntmax() BIND(C,name='it_getntmax')
         use PrecisionMod, only: C_INT
         use TimeTools
         it_getntmax=int(Time%ntmax,C_INT);
