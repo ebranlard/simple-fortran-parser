@@ -1,27 +1,24 @@
 !> 
 module InterfaceLink
     use PrecisionMod, only: C_DOUBLE, C_INT, C_CHAR, MK
-    use OmnivorIO,    only: log_error, log_info, log_warning
+    use HerbiVorIO,    only: log_error, log_info, log_warning
     use CStrings, only: cstring2fortran
     implicit none
 
 contains
 
     subroutine io_term() BIND(C,name='io_term')
-        use PrecisionMod
-        use OmnivorLink
-        implicit none
-        !
-        call omnivor_term(); 
+        use HerbiVor
+        call herbivor_term(); 
     end subroutine
     
     !> Returns 1 if library has no error
     integer(C_INT) function check() BIND(C,name='check')
         use PrecisionMod, only: C_INT
-        use OmnivorErrorState, only: is_omnivor_in_error_state
+        use HerbiVorErrorState, only: is_herbivor_in_error_state
         !
         check=int(1,C_INT)
-        if(is_omnivor_in_error_state()) then
+        if(is_herbivor_in_error_state()) then
             check=int(0,C_INT); 
             !print*,'Library in error state'
         endif
@@ -29,13 +26,13 @@ contains
 
     !> Returns 1 if library has no error
     subroutine error_solved() BIND(C,name='error_solved')
-        use OmnivorErrorState, only: set_omnivor_error_state
-        call set_omnivor_error_state(.false.)
+        use HerbiVorErrorState, only: set_herbivor_error_state
+        call set_herbivor_error_state(.false.)
     end subroutine
 
     !> Getting a string variable
     subroutine io_set_output_to_std(flag_c) BIND(C, NAME='io_set_output_to_std')
-        use OmnivorIO, only: set_output_to_std
+        use HerbiVorIO, only: set_output_to_std
         use PrecisionMod,only:C_INT
         !
         integer(C_INT),intent(in) :: flag_c   !< 1=output to std
@@ -47,12 +44,12 @@ contains
     !> Setting a number variable
     subroutine io_set_var(svar_c,rval) BIND(C, NAME='io_set_var')
         use CStrings, only: cstring2fortran
-        use OmnivorIO, only: log_error,log_info
-        use OmnivorIO, only: bdebug_set_triggers
+        use HerbiVorIO, only: log_error,log_info
+        use HerbiVorIO, only: bdebug_set_triggers
         use PrecisionMod,only:MK, C_DOUBLE, C_CHAR
         use MatlabFunctions,only: num2str
         use TimeTools,only: setdt,settmax
-        use OmnivorData ! The variables we will change are in this module
+        use HerbiVorData ! The variables we will change are in this module
         use WindData, only: TurbPart
         use TimeInfoTools, only: set_action_time_var
         use StringUtils,       only: strsplit, T_SubStrings, substr_term
@@ -66,10 +63,10 @@ contains
     end subroutine
 
 
-    !> Getting Omnivor version
+    !> Getting HerbiVor version
     subroutine io_print_version() BIND(C,name='io_print_version')
-        use OmnivorLink, only: omnivor_print_version_no_log
-        call omnivor_print_version_no_log()
+        use HerbiVorLink, only: herbivor_print_version_no_log
+        call herbivor_print_version_no_log()
     end subroutine
 
     !> Add a velocity field request with method v1 v2 v3 in global coord
@@ -105,10 +102,10 @@ contains
     subroutine it_setTmax(t_max_in) BIND(C,name='it_setTmax')
         use PrecisionMod, only: MK, C_DOUBLE
         use TimeTools
-        use OmnivorData
+        use HerbiVorData
         real(C_DOUBLE),intent(in) :: t_max_in;
         call setTmax(real(t_max_in,MK))
-        call settmax_omnivor(real(t_max_in,MK))
+        call settmax_herbivor(real(t_max_in,MK))
     end subroutine
 
     real(C_DOUBLE) function it_Time%dt() BIND(C,name='it_getdt')

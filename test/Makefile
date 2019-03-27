@@ -1,7 +1,7 @@
 all:test
 	
 test:
-	@python ./Test.py
+	@python ./test_write.py
 	diff Interface_gen*.f90
 	diff ProfileTypes_gen*.f90
 
