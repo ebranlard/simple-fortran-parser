@@ -139,9 +139,13 @@ class FortranFile:
 
                     elif words[0].lower()=='type':
                         if not bIsInMethod:
-                            # Creating a new type
-                            t=FortranType(words[1])
-                            bIsInType=True
+                            if l.find('save')>0 or l.find('::')>0:
+                                # TODO: type (XXX), save :: myvar  (in a module declaration)
+                                eprint('Warning: type attributes declaration not yet supported: '+l)
+                            else:
+                                 # Creating a new type
+                                t=FortranType(words[1])
+                                bIsInType=True
                         else:
                             s.append_raw(l,c)
                     elif words[0].lower()=='endtype':
@@ -1287,7 +1291,7 @@ class FortranDeclaration(dict):
                     self['intent']='inout'
 
             if self['pointer'] and len(self['varvalue'])==0 and self.IsTypeDeclaration:
-                print('Warning: %s not initialized to null'%(self['varname']))
+                eprint('Warning: %s not initialized to null'%(self['varname']))
 
             # Catching the comment
             if len(comment)>0:
@@ -1297,7 +1301,7 @@ class FortranDeclaration(dict):
                     self['alias']=True
 
         else:
-            print('Error, this script assumes definition with ::')
+            eprint('Error, this script assumes definition with `::`, line:',l)
 
 
     def write_to_file(self,f,indent='    '):
