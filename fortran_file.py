@@ -19,11 +19,15 @@
 # --------------------------------------------------------------------------------
 # ---  
 # --------------------------------------------------------------------------------
-from fortran_parse_tools import*
-from fortran_to_c import*
+from __future__ import print_function
 import sys 
 import re
 import os
+
+from fortran_parse_tools import*
+from fortran_to_c import*
+from stderr import eprint
+
 
 
 # The routines of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
@@ -117,24 +121,29 @@ class FortranFile:
                             m.MethodList.append(s) 
                             bIsInMethod=False
                         else:
-                            print('Error, subroutines not inmodules not handled yet')
+                            eprint('Error, subroutines not in modules not handled yet')
                     elif words[0].lower()=='endfunction':
                         if bIsInModule:
                             m.MethodList.append(s)
                             bIsInMethod=False
                         else:
-                            print('Error, subroutines not inmodules not handled yet')
+                            eprint('Error, subroutines not in modules not handled yet')
                     elif words[0].lower()=='use':
-                        if not bIsInMethod :
-                            m.UseStatements.append(l)
+                        if not bIsInModule:
+                            eprint('Error, use statements not in modules not handled yet')
                         else:
-                            s.append_raw(l,c)
+                            if not bIsInMethod :
+                                m.UseStatements.append(l)
+                            else:
+                                s.append_raw(l,c)
 
                     elif words[0].lower()=='type':
                         if not bIsInMethod:
                             # Creating a new type
                             t=FortranType(words[1])
                             bIsInType=True
+                        else:
+                            s.append_raw(l,c)
                     elif words[0].lower()=='endtype':
                         m.TypeList.append(t)
                         bIsInType=False
@@ -285,11 +294,11 @@ class FortranModule:
             m=mod_found
             if m is not None:
                 if len(m)>1:
-                    print('Warning Multiple options : Type %s - Module %s'%(t,m))
+                    eprint('Warning Multiple options : Type %s - Module %s'%(t,m))
                 m=m[0]
-                #print('Solved Dependency: Type %s - Module %s'%(t,m))
+                #eprint('Solved Dependency: Type %s - Module %s'%(t,m))
             else:
-                print('Warning: Unresolved Dependency: Type %s'%(t))
+                eprint('Warning: Unresolved Dependency: Type %s'%(t))
 
             self.type_depend_mod.append(m)
 
@@ -391,6 +400,9 @@ class FortranModule:
         f.write('end module %s\n'%get_type_tool_module(self.name))
 
 
+# --------------------------------------------------------------------------------}
+# --- Fortran Use Statement
+# --------------------------------------------------------------------------------{
 class FortranUseStatements:
 
 
@@ -475,7 +487,7 @@ class FortranType:
             if not d['built_in']:
                 self.dependencies.append(d['type'])
                 if d['type']==self.raw_name:
-                    print('Info: The following type is recursive:'+ d['type'])
+                    eprint('Info: The following type is recursive:'+ d['type'])
                     self.bRecursive=True
 
     def write_to_file(self,f,indent=''):
@@ -781,14 +793,14 @@ class FortranType:
                 dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
                 dsp =d['varname'].ljust(MAX_VAR_LENGTH)
                 if d['pointer'] or d['allocatable']:
-                    print('Fortran File TODO',d)
+                    eprint('Fortran File TODO',d)
                 else:
                     if d['ndimensions']==0:
                         select_in='1'
                     elif d['ndimensions']==1:
                         select_in='1:%s'%d['dimension']
                     else:
-                        print('Fortran File TODO more than one dimension for inputs')
+                        eprint('Fortran File TODO more than one dimension for inputs')
 
                     if d['type']=='logical' :
                         FS.append_corpus("case(%s); X%%%s = int(rvec(%s))==1"%(dqsp,dsp,select_in))
@@ -804,7 +816,7 @@ class FortranType:
                                 FS.append_corpus("    if (SubStrings%n/=2) call log_error('Impossible to set '//trim(svar))")
                                 FS.append_corpus('    call %s_set_var(X%%%s,SubStrings%%s(2),rvec)'%(d['pretty_type'],d['varname']))
                             else:
-                                print("Derived type skipped for inputs %s"%d['type'])
+                                eprint("Derived type skipped for inputs %s"%d['type'])
 
 
             FS.append_corpus("case default")
@@ -817,6 +829,9 @@ class FortranType:
 
 
 
+# --------------------------------------------------------------------------------}
+# --- Fortran Method 
+# --------------------------------------------------------------------------------{
 class FortranMethod(object):
     def __init__(self,name='',raw_name=''):
         # A bit of a mess between name, raw_name and bind_name. I guess name and bind_name are the same.. I should get rid of raw_name. But replacement needs care for signature (C etc..)
@@ -875,6 +890,7 @@ class FortranMethod(object):
         # --------------------------------------------------------------------------------
         # ---  Analysing raw_name
         # --------------------------------------------------------------------------------
+        #print('RawName:',self.raw_name)
         words=self.raw_name.lower().split(' ')
         for (w,i) in zip(words,range(len(words))):
             if w=='subroutine':
@@ -887,15 +903,17 @@ class FortranMethod(object):
         before_method = ' '.join(words[0:i]).strip()
         after_method  = ' '.join(words[i+1:]).strip()
         # Joining all, and replacing () with space and splitting
-        after_method=after_method.replace(' ','')
-        after_method2=after_method.replace('(',' ')
-        after_method2=after_method2.replace(')',' ')
+        # NOTE: some methods can have no parenthesis 
+        after_method  = after_method.replace(' ','')
+        after_method2 = after_method.replace('(',' ')
+        after_method2 = after_method2.replace(')',' ')
         words=after_method2.split(' ')
         # Trying to catch a result 
 #         if after_method.find('result(')
         self.name=words[0]
-        if len(words[1])>0:
-            self.arglist_name_raw=words[1].split(',')
+        if len(words)>1:
+            if len(words[1])>0:
+                self.arglist_name_raw=words[1].split(',')
 
         # --------------------------------------------------------------------------------
         # ---  Things after signature (i.e. bind and result) NASTY
@@ -930,8 +948,12 @@ class FortranMethod(object):
         tmp_arg_list=[];
         tmp_arg_list_raw=[];
         tmp_arg_list_raw_comment=[];
+        #
+        tmp_ptr_list=[];
+        tmp_ptr_list_raw=[];
+        tmp_ptr_list_raw_comment=[];
+
         for (line,comment) in zip(self.raw_lines,self.raw_comment_lines):
-            #print(line)
             l=line.strip()
             words=l.split(' ')
             # Detecting declaration
@@ -940,17 +962,55 @@ class FortranMethod(object):
             # Detecting Use statement
             bUseStatement=words[0].lower()=='use'
             if bDeclaration:
-                # handling several varaibles declared on one line
+                # --- handling several varaibles declared on one line
                 l_before=l[0:i_dots].strip()
                 l_after =l[i_dots+2:].strip()
-                variables=l_after.split(',') 
+                splits=l_after.split(',') 
+                variables=[]
+                tmp=''
+                # handling declarations of the type :: a(1,2), b, M(:,:)
+                bInPar=False
+                for s in splits:
+                    no=s.count('(')
+                    nc=s.count(')')
+                    if no==nc+1:
+                        tmp+=s+','
+                        bInPar=True
+                    elif nc==no+1:
+                        variables.append(tmp+s)
+                        tmp=''
+                        bInPar=False
+                    else:
+                        if bInPar:
+                            tmp+=s+','
+                        else:
+                            variables.append(s)
+                #if len(splits)>0:
+                #    print('Splits   : ',splits)
+                #    print('Variables: ',variables)
                 for var in variables:
+                    # Old fashion declaration `a(5)`, to new fashion: `dimension(5) :: a` :
+                    io=var.find('(')
+                    ic=var.rfind(')')
+                    if io>0 and ic>0:
+                        dim=var[io+1:ic]
+                        if len(dim.strip())>0: # it could be x => null()
+                            var=var[:io]
+                            l_before += ', dimension('+dim+') '
+                            #print(l_before+':: '+var)
+
+
                     l_tmp=l_before+'::'+var
+                    l_tmp_no_space=l_tmp.replace(' ','').lower()
                     #print(l_tmp)
-                    if l_tmp.find('intent')>=0:
+                    if l_tmp_no_space.find(',intent')>=0 or l_tmp_no_space.find(',optional')>=0 >=0 : 
                         tmp_arg_list.append(FortranDeclaration(l_tmp,comment)) # temporary storing arguments (since maybe not in proper order)
-                        tmp_arg_list_raw.append(l_tmp) # temporary storing arguments (since maybe not in proper order)
-                        tmp_arg_list_raw_comment.append(comment) # temporary storing arguments (since maybe not in proper order)
+                        tmp_arg_list_raw.append(l_tmp)
+                        tmp_arg_list_raw_comment.append(comment) 
+                    elif l_tmp_no_space.find(',pointer')>=0 or l_tmp_no_space.find(',dimension(:')>0 or l_tmp_no_space.find(',target'):
+                        tmp_ptr_list.append(FortranDeclaration(l_tmp,comment)) # temporary storing arguments (since maybe not in proper order)
+                        tmp_ptr_list_raw.append(l_tmp)
+                        tmp_ptr_list_raw_comment.append(comment) 
                     else:
                         self.append_var(l_tmp,comment)
 
@@ -968,20 +1028,51 @@ class FortranMethod(object):
 #         print(tmp_arg_list)
 #         print(self.arglist_name_raw)
         #print(self.arglist)
-        if len(tmp_arg_list)!=len(self.arglist_name_raw):
-            print('Error: Arguments in method list and declared do not match for %s! Did you use intent everywhere?'%self.name)
+        if len(tmp_arg_list)>len(self.arglist_name_raw):
+            eprint('Error: More arguments declared with `intent` than declared on the signature of %s!'%self.name)
+            eprint('Signature arguments: ',self.arglist_name_raw)
+            eprint('Argument list          : ')
+            for d in tmp_arg_list:
+                eprint('  varname: {}  - intent {}'.format(d['varname'],d['intent']))
+            eprint(' ')
             sys.exit(-1)
-        else:
-            for arg_name in self.arglist_name_raw:
-                for (d,idecl) in zip(tmp_arg_list,range(len(tmp_arg_list))):
-                    bFound=False
+        #if len(tmp_arg_list)!=len(self.arglist_name_raw):
+        #    eprint('Warning: Arguments in method declaration line and argument declaration list do not match for %s! Did you use intent everywhere?'%self.name)
+        #    eprint('Method declaration list: ',self.arglist_name_raw)
+        #    eprint('Argument list          : ')
+        #    for d in tmp_arg_list:
+        #        eprint('  varname: {}  - intent {}'.format(d['varname'],d['intent']))
+            #sys.exit(-1)
+        # Looping on signature arguments, trying to find the matching declaration
+        for arg_name in self.arglist_name_raw:
+            # Looking in intent list
+            bFound=False
+            for (d,idecl) in zip(tmp_arg_list,range(len(tmp_arg_list))):
+                if d['varname'].lower()==arg_name.lower():
+                    self.append_arg(tmp_arg_list_raw[idecl], tmp_arg_list_raw_comment[idecl])
+                    bFound=True
+                    break
+            # If not found, we look in pointers
+            if not bFound:
+                for (d,idecl) in zip(tmp_ptr_list,range(len(tmp_ptr_list))):
                     if d['varname'].lower()==arg_name.lower():
-                        self.append_arg(tmp_arg_list_raw[idecl], tmp_arg_list_raw_comment[idecl])
+                        self.append_arg(tmp_ptr_list_raw[idecl], tmp_ptr_list_raw_comment[idecl])
                         bFound=True
                         break
-                if not bFound:
-                    print('Error: argument %s not found in declaration list of %s '%(arg_name,self.name))
-                    sys.exit(-1)
+            # If still not found that's an error
+            if not bFound:
+                eprint('  ')
+                eprint('Signature arguments:\n','   ',self.arglist_name_raw)
+                eprint('Argument and pointer list: ')
+                for d in tmp_arg_list:
+                    eprint('      intent var: {}  - intent {}'.format(d['varname'],d['intent']))
+                for d in tmp_ptr_list:
+                    eprint('      ptr   var : {}  - intent {}'.format(d['varname'],d['intent']))
+                eprint('  ')
+                eprint('Error: argument `%s` not found in the declaration list of `%s` '%(arg_name,self.name))
+                eprint('       Did you use `intent` everywhere (except pointers)?')
+                eprint(' ')
+                sys.exit(-1)
 
         # print(self.arglist)
 

@@ -45,9 +45,20 @@ int it_incrementtime();
 
 ## Limitations 
 The script is not general. No parsing of the routine contents is done.
-The parser is limited to verbose fortran 90 declarations of the kind:
+The parser is limited to verbose fortran 90 declarations with `::`, as:
 ```fortran    
     real(MK), dimension(:), intent(inout) :: A !<
+```
+The following declarations are also supported:
+```fortran    
+    real*8  :: A(3), B(:,:), x, C( n(1) , n(2) )
+```
+The declaration above will be converted to its verbose form:
+```fortran    
+    real*8, dimension(3)        :: A
+    real*8, dimension(:,:)      :: B
+    real*8                      :: x
+    real*8, dimension(n(1),n(2)):: C
 ```
 
 

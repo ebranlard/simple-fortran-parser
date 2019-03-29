@@ -32,10 +32,10 @@ def main(argv):
     parser.add_argument('--version', action='version', version='%(prog)s 1.0')
     parser.add_argument('--stdout' , action ='store_true' )
     parser.add_argument('--verbose', action ='store_true' )
+    parser.add_argument('--debug', action ='store_true' )
     parser.add_argument('files', nargs='+', help='List of files')
     opts = parser.parse_args(argv)
     files=opts.files
-    print(opts)
 
     # We loop on files, process them.
     if (files[0].strip()=='-'):
@@ -46,6 +46,8 @@ def main(argv):
     else:
         out=''
     for filename in files:
+        if opts.debug:
+            print('Processing: ',filename)
         process_file(filename,out, opts.verbose)
 
 

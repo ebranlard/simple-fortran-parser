@@ -1,14 +1,15 @@
 from __future__ import print_function
 from parsing_tools import*
 import re
+from stderr import eprint
 
 # split an expression looking for comment and continuation sign
 def line_not_supported_warning(line):
     l=line.join(' ')
     if len(l)>0:
         if l.find('&!')>0:
-            print('Warning: the following line can raise possible issue, since continuation with comments are not supported:')
-            print(line)
+            eprint('Warning: the following line can raise possible issue, since continuation with comments are not supported:')
+            eprint(line)
 
 
 
@@ -18,20 +19,42 @@ def bind_lines(lines):
     parsed_lines=[];
     bCat=False
     line_cat=[];
+    #print('-----------------------------------------------------')
+    #print(''.join(lines))
+    #print('-----------------------------------------------------')
     for line in lines:
         line_not_supported_warning(line)
         l=line.strip()
+        # If it's a comment, we cancel all
+        if len(l)>0:
+            if l[0]=='!':
+                if bCat:
+                    eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
+                    eprint('Previous line: ',line_cat)
+                    eprint('Current line: ',l)
+                    parsed_lines.append(line_cat)
+                    parsed_lines.append(l)
+                else:
+                    parsed_lines.append(l)
+                bCat=False
+                continue
         if bCat:
             # let's see if it's a fortran multiple line string
+            ll=l
             if l[0]=='&':
-                l=l[1:]
-            if l[-1]=='&':
-                l=l[-1]
+                ll=l[1:]
+            if ll[-1]=='&':
+                ll=l[:-1]
                 # we'll continue cating
                 bCat=True
             else:
                 bCat=False
-            line_cat=line_cat+l
+            line_cat=line_cat+ll
+            #print(' ')
+            #print('line cat:',line_cat)
+            #print('       l:',l)
+            #print('      ll:',ll,'bCat',bCat)
+            #print(' ')
         else:
             #  Initialization of line_cat
             bCat=False
@@ -42,12 +65,11 @@ def bind_lines(lines):
                 else:
                     line_cat=l
             else:
-                line_cat=l
+                line_cat=''
         if not bCat:
             if len(line_cat)>0:
                 parsed_lines.append(line_cat)
 #                 print(line_cat)
-        
 
     return(parsed_lines)
 
