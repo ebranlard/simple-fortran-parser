@@ -75,38 +75,37 @@ def bind_lines(lines):
 
 # Remove fortran comments from lines
 # The case of comment after multiple line string is not supported
+
+def split_comment(line):
+    line=line.strip()
+    pos=find_pos(line,'!')
+    comment=''
+    l=line
+    if len(pos)>0:
+        if pos[0]==0:
+            # Trivial case, the whole line is a comment
+            l=[];
+            
+        else:
+            # We neglect comments within string
+            i=0
+            bOK=False
+            while i<len(pos):
+                if not is_in_quotes(line,pos[i]):
+                    bOK=True
+                    break
+                i=i+1
+            if bOK:
+                comment=l[(pos[i]):]
+                l=l[:(pos[i])]
+    return l,comment
+
+
 def remove_comments(lines):
     parsed_lines=[];
     comments=[];
     for line in lines:
-        line=line.strip()
-        pos=find_pos(line,'!')
-        comment=''
-        l=line
-        if len(pos)>0:
-            if pos[0]==0:
-                # Trivial case, the whole line is a comment
-                l=[];
-                
-            else:
-                # We neglect comments within string
-                i=0
-                bOK=False
-                while i<len(pos):
-                    if not is_in_quotes(line,pos[i]):
-                        bOK=True
-                        break
-                    i=i+1
-
-
-                if bOK:
-                    comment=l[(pos[i]):]
-                    l=l[:(pos[i])]
-                
-#                 else:
-#                     print('Prolematic line:')
-#                     print(line)
-
+        (l,comment)=split_comment(line)
         if len(l)>0:
             parsed_lines.append(l)
             comments.append(comment)

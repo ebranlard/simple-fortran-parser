@@ -131,6 +131,13 @@ end subroutine"""
         self.assert_string(FortranDeclarations(s).tostring().strip(),s_ref)
 
 
+# --------------------------------------------------------------------------------}
+# --- UseStatement 
+# --------------------------------------------------------------------------------{
+    def test_use(self):
+        # test-multiline
+        s='use MyMod, only: this, that ! comment'
+        self.assert_string(FortranUseStatement(s).tostring().strip(),s)
 
 # --------------------------------------------------------------------------------}
 # --- Entitiy

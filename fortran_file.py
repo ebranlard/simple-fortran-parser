@@ -63,6 +63,8 @@ def get_type_tool_module(module):
     return(module_out)
 
 
+INDENT='    '
+
 # --------------------------------------------------------------------------------
 # ---  FortranFile class
 # --------------------------------------------------------------------------------
@@ -148,7 +150,7 @@ class FortranFile:
                     eprint('    line:  ',l)
                 else:
                     if not bIsInMethod :
-                        m.UseStatements.append(l,c)
+                        m.UseStatements.append(FortranUseStatement(l,c))
                     else:
                         s.append_raw(l,c)
 
@@ -275,19 +277,17 @@ class FortranFile:
 class FortranModule:
     def __init__(self,name):
         self.name=name
-
         # UseStatement
-        self.UseStatements=FortranUseStatements(line=[])
+        self.UseStatements=FortranUseStatements([])
         # Types
         self.TypeList=[]
         self.type_dependencies=[]
         self.type_depend_mod=[]
-        # Interfaces
-        # Variables
+        # Interfaces #TODO
+        # Variables #TODO
         # Methods
         self.MethodList=[]
         # Misc
-        self.indent='    '
 
     def analyse_raw_data(self):
         # Types
@@ -302,9 +302,6 @@ class FortranModule:
             t.analyse_raw_data()
             self.type_dependencies.append(t.dependencies)
 
-        # Analyse use statements
-        self.UseStatements.analyse_raw_data()
-        
         # Analyse Methods
         for m in self.MethodList:
             #print('Analysing raw input for Method: '+m.name+m.raw_name)
@@ -358,11 +355,11 @@ class FortranModule:
         s=''
         s+='module %s\n'%self.name
         # Use statements
-        s+=self.UseStatements.tostring(indent=self.indent)
-        s+='%simplicit none\n'%self.indent
+        s+=self.UseStatements.tostring(indent=INDENT)
+        s+=INDENT+'implicit none\n'
         ## Types
         for i,t in enumerate(self.TypeList):
-            s+=t.tostring(self.indent)
+            s+=t.tostring(INDENT)
             if i<len(self.TypeList)-1:
                 s+='\n'
 
@@ -370,7 +367,7 @@ class FortranModule:
         if len(self.MethodList)>0:
             s+='contains\n'
             for m in self.MethodList:
-                s+=m.tostring(indent=self.indent)+'\n'+'\n'
+                s+=m.tostring(indent=INDENT)+'\n'+'\n'
         s+='end module %s'%self.name
         return s
 
@@ -453,7 +450,6 @@ class FortranModule:
                     routines=tool['routines'];
                     func_call='t.write_tool_%s(f,routines)'%tool['interface']
                     eval(func_call)
-#                 t.write_type_tools(f,self.indent)
 
         f.write('end module %s\n'%get_type_tool_module(self.name))
 
@@ -461,41 +457,40 @@ class FortranModule:
 # --------------------------------------------------------------------------------}
 # --- Fortran Use Statement
 # --------------------------------------------------------------------------------{
-class FortranUseStatements:
-    def __init__(self,line=[],comments=[]):
-        self.raw_lines=line
-        self.comments=comments
-        self.statements=[]
-        self.indent='    '
-        # static data
+class FortranUseStatements(list):
+    def __init__(self,Statements=[],comments=[]):
+        """ Initialize a list of use statements, Statements is either:
+             - a list of FortranDeclaration  
+             - a list of strings
+             - a string
+        """
 
-    def append(self,line,comment=''):
-        self.raw_lines.append(line)
-        self.comments.append(comment)
+        raw_lines=None
+        # Check whether the use provided a list of statements
+        if type(Statements) is list and (all([type(d) is FortranUseStatement for d in Statements])):
+            super(FortranUseStatements,self).__init__(Statements)
+        else:
+            super(FortranStatements,self).__init__([])
+            raw_lines=Statements if len(Statements)>0 else None
 
-    def analyse_raw_data(self):
-        for l in self.raw_lines:
-            #d=self.default_dict_.copy()
-            d=dict(module='',only_list=[])
-            sp=l.split(':')
-            if len(sp)>1:
-                d['only_list']=sp[1].replace(' ','').split(',')
+        if raw_lines is not None:
+            if type(raw_lines) is not list:
+                raw_lines=raw_lines.split('\n')
+            lines = bind_lines(raw_lines);
+            (lines,comments_new) = remove_comments(lines);
+            if len(comments)==0:
+                comments=comments_new
+            elif len(comments)!=len(lines):
+                raise Exception('When providing comments list for use statements, the length of the comments shoulw match the number of lines')
+            # adding
+            for l,c in zip(raw_lines,comments):
+                self.append(FortranUseStatement(line=l,comment=c))
 
-            d['module']=sp[0].replace(',',' ').replace('  ',' ').split(' ')[1].strip()
-
-            self.statements.append(d)
-
-    def tostring(self,indent=''):
-        """ Use statement to string """
+    def tostring(self, indent=''):
+        """ Use statement list to string """
         s='' 
-        for st in self.statements:
-            u='use '+st['module']
-            if len(st['only_list'])>0:
-                u+=', only: '
-                for o in st['only_list']:
-                    u+=o+', '
-                u=u[:-2]
-            s+=indent + u +'\n'
+        for st in self:
+            s+=st.tostring(indent)+'\n'
         return s
 
     def __repr__(self):
@@ -506,7 +501,7 @@ class FortranUseStatements:
 
     def find_in_only_list(self,t):
         found=None
-        for s in self.statements:
+        for s in self:
             if len(s['only_list'])>0:
                 found=[o for o in s['only_list'] if o.lower()==t.lower() ]
                 if len(found)>0:
@@ -518,14 +513,48 @@ class FortranUseStatements:
         return found
 
     def find_in_module_name(self,t):
-        found=[o['module'] for o in self.statements if o['module'].lower().find(t.lower())>=0 ]
+        found=[o['module'] for o in self if o['module'].lower().find(t.lower())>=0 ]
         if len(found)==0:
             found=None
         return found
 
+# --------------------------------------------------------------------------------}
+# --- FotranUseStatement
+# --------------------------------------------------------------------------------{
+class FortranUseStatement(dict):
+    def __init__(self,line='',comment=''):
+        """ Use Statement """
+        # initialize ict
+        d=dict(module='',only_list=[])
+        super(FortranUseStatement,self).__init__(\
+                module=True,\
+                only_list=[],\
+                comment='')
+        # --- Splitting comment
+        if len(comment)==0:
+            (line,comment) = split_comment(line);
+        # --- Parsing 
+        sp=line.split(':')
+        if len(sp)>1:
+            self['only_list']=sp[1].replace(' ','').split(',')
+        self['module']  = sp[0].replace(',',' ').replace('  ',' ').split(' ')[1].strip()
+        if len(comment)>0:
+            self['comment'] = ' '+comment
 
+    def tostring(self, indent=''):
+        """ Use statement to string """
+        s='' 
+        u='use '+self['module']
+        if len(self['only_list'])>0:
+            u+=', only: '
+            for o in self['only_list']:
+                u+=o+', '
+            u=u[:-2]
+        s+=indent + u + self['comment']
+        return s
 
-
+    def __repr__(self):
+        return self.tostring()
 
 # --------------------------------------------------------------------------------}
 # --- Fortran Type 
@@ -543,9 +572,6 @@ class FortranType:
         self.dependencies=[]
         self.Declarations=[]
 
-        # Misc
-        self.indent='    '
-
     def append(self,line,comment=''):
         self.raw_lines.append(line)
         self.Declarations.append(FortranDeclaration(line,comment,inType=True))
@@ -558,12 +584,12 @@ class FortranType:
                     eprint('Info: The following type is recursive:'+ d['type'])
                     self.bRecursive=True
 
-    def tostring(self,indent=''):
+    def tostring(self, indent=''):
         """ Type to string"""
         s=''
         s+='%stype %s\n'%(indent,self.raw_name)
         for d in self.Declarations:
-            s+=d.tostring(indent+self.indent)+'\n'
+            s+=d.tostring(indent+INDENT)+'\n'
         s+=indent+'end type\n'
         return s
 
@@ -798,10 +824,9 @@ class FortranType:
             # Writting routine name
             FS=self._getRoutine0io('_set_var_s')
             # Use Statements
-            FS.UseStatements.append('use StringUtils, only: strsplit, T_SubStrings, substr_term')
-            FS.UseStatements.append('use Logging, only: log_info, log_error')
-            FS.UseStatements.append('use MainIOData, only: bDEBUG')
-            FS.UseStatements.analyse_raw_data()
+            FS.UseStatements.append(FortranUseStatement('use StringUtils, only: strsplit, T_SubStrings, substr_term'))
+            FS.UseStatements.append(FortranUseStatement('use Logging, only: log_info, log_error'))
+            FS.UseStatements.append(FortranUseStatement('use MainIOData, only: bDEBUG'))
             # Arguments
             FS.append_arg('character(len=*), intent(in) :: svar')
             FS.append_arg('character(len=*), intent(in) :: sval')
@@ -846,12 +871,11 @@ class FortranType:
             # Writting routine name
             FS=self._getRoutine0io('_set_var_v')
             # Use Statements
-            FS.UseStatements.append('use PrecisionMod, only: MK')
-            FS.UseStatements.append('use StringUtils, only: strsplit, T_SubStrings, substr_term')
-            FS.UseStatements.append('use Num2StrMod, only: num2str')
-            FS.UseStatements.append('use Logging, only: log_info, log_error')
-            FS.UseStatements.append('use MainIOData, only: bDEBUG')
-            FS.UseStatements.analyse_raw_data()
+            FS.UseStatements.append(FortranUseStatement('use PrecisionMod, only: MK'))
+            FS.UseStatements.append(FortranUseStatement('use StringUtils, only: strsplit, T_SubStrings, substr_term'))
+            FS.UseStatements.append(FortranUseStatement('use Num2StrMod, only: num2str'))
+            FS.UseStatements.append(FortranUseStatement('use Logging, only: log_info, log_error'))
+            FS.UseStatements.append(FortranUseStatement('use MainIOData, only: bDEBUG'))
             # Arguments
             FS.append_arg('character(len=*), intent(in) :: svar')
             FS.append_arg('real(MK),dimension(:) :: rvec')
@@ -926,11 +950,10 @@ class FortranMethod(object):
         self.varlist_raw=[]
         self.varlist=[]
         self.corpus=[]
-        self.indent='    '
         self.bRecursive=False
         self.return_type=''
         # UseStatement
-        self.UseStatements=FortranUseStatements(line=[])
+        self.UseStatements=FortranUseStatements([])
 
         if raw_lines is not None:
             if type(raw_lines) is not list:
@@ -967,7 +990,7 @@ class FortranMethod(object):
             self.arglist_str+=','+decl['varname']
 
     def analyse_raw_data(self):
-        self.UseStatements=FortranUseStatements(line=[])
+        self.UseStatements=FortranUseStatements([])
         # --------------------------------------------------------------------------------
         # ---  Analysing raw_name
         # --------------------------------------------------------------------------------
@@ -1049,14 +1072,12 @@ class FortranMethod(object):
                 decl_lines.append(l)
                 decl_comments.append(comment)
             elif bUseStatement:
-                self.UseStatements.append(l)
+                self.UseStatements.append(FortranUseStatement(l,comment))
                 #print(l)
             else:
                 self.append_corpus(l)
 #             if pattern_intent_in.match(l):
 #             pass
-
-
         # --------------------------------------------------------------------------------
         # --- Handling declarations, arguments variables
         # --------------------------------------------------------------------------------
@@ -1089,12 +1110,6 @@ class FortranMethod(object):
         for d in decl_stack:
             self.append_var(d)
         # print(self.arglist)
-
-        # --------------------------------------------------------------------------------
-        # ---  Analysing use statements
-        # --------------------------------------------------------------------------------
-        self.UseStatements.analyse_raw_data()
-
 
     def setRecusive(self,bRecursive):
         self.bRecursive=bRecursive
@@ -1145,7 +1160,7 @@ class FortranMethod(object):
 # 
 #         f.write(');\n');
 
-    def tostring(self,indent='    ',verbose=False):
+    def tostring(self, indent='    ',verbose=False):
         """ Routine to string """
         s=''
         s+=''
@@ -1166,7 +1181,7 @@ class FortranMethod(object):
         # --------------------------------------------------------------------------------
         # ---  Use statements
         # --------------------------------------------------------------------------------
-        s+=self.UseStatements.tostring(self.indent+indent)
+        s+=self.UseStatements.tostring(INDENT+indent)
         # --------------------------------------------------------------------------------
         # ---  Arguments and variable declaration
         # --------------------------------------------------------------------------------
@@ -1175,23 +1190,23 @@ class FortranMethod(object):
 
         if len(self.arglist)>0:
             if verbose:
-                s+='%s! Arguments declaration\n'%(indent+self.indent)
+                s+='%s! Arguments declaration\n'%(indent+INDENT)
             for d in self.arglist:
-                s+=d.tostring(indent+self.indent)+'\n'
+                s+=d.tostring(indent+INDENT)+'\n'
 
         if len(self.varlist)>0:
             if verbose:
-                s+='%s! Variable declaration\n'%(indent+self.indent)
+                s+='%s! Variable declaration\n'%(indent+INDENT)
             for d in self.varlist:
-                s+=d.tostring(indent+self.indent)+'\n'
+                s+=d.tostring(indent+INDENT)+'\n'
 
         if len(self.corpus)>0:
             if verbose:
-                s+='%s! Corpus\n'%(indent+self.indent)
+                s+='%s! Corpus\n'%(indent+INDENT)
             for l in self.corpus:
                 if len(l)>0:
                     for ll in l.split('\n'):
-                        s+='%s%s\n'%(indent+self.indent,ll)
+                        s+='%s%s\n'%(indent+INDENT,ll)
         #f.write('%send %s %s\n\n'%(indent,self.type,self.name))
         s+='%send %s'%(indent,self.type)
         return s
@@ -1205,8 +1220,7 @@ class FortranMethod(object):
         f.write('%s%s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
         for d in self.arglist:
             d['pointer']=False
-            d.write_to_file(f,indent+self.indent)
-#             f.write('%s%s\n'%(indent+self.indent,l))
+            d.write_to_file(f,indent+INDENT)
         f.write('%send %s %s\n\n'%(indent,self.type,self.name))
 
 
@@ -1299,7 +1313,7 @@ class FortranDeclarations(list):
                 self.append(FortranDeclaration(l_tmp,comment))
                 comment='' # only the first declaration gets the comment
 
-    def tostring(self,indent=''):
+    def tostring(self, indent=''):
         """ Declaration list to string """
         s=''
         for d in self:
@@ -1311,6 +1325,9 @@ class FortranDeclarations(list):
 
 
 
+# --------------------------------------------------------------------------------}
+# ---  
+# --------------------------------------------------------------------------------{
 class FortranDeclaration(dict):
     def __init__(self,l,comment='',inType=False,argument=False):
         super(FortranDeclaration,self).__init__(\
@@ -1422,7 +1439,7 @@ class FortranDeclaration(dict):
     def __repr__(self):
         return self.tostring()
 
-    def tostring(self,indent=''):
+    def tostring(self, indent=''):
         s=''
         attributes=self['type_raw'];
         if len(self['dimension'])>0:
