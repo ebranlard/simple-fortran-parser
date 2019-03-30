@@ -54,7 +54,6 @@ def main(argv):
 def process_file(filename,filename_out,verbose=False):
     with open(filename,'r') as f:
         f=FortranFile(filename);
-        f.read()
         f.write_signatures(filename_out,verbose=verbose)
 
 

@@ -113,6 +113,35 @@ def remove_comments(lines):
     return(parsed_lines,comments)
 
 
+def first_entity(s):
+    sc  = s.find(',')
+    sop = s.find('(')
+    if (sc<=0):
+        tr=s
+    elif (sop<=0):
+        tr=s.split(',')[0].strip()
+    else:
+        if (sc<sop):
+            tr=s.split(',')[0].strip()
+        else:
+            # comma between some parenthesis or after, we find the matching parenthesis
+            i=sop
+            nToClose=0
+            bFound=False
+            while i<len(s):
+                if s[i]=='(':
+                    nToClose+=1
+                if s[i]==')':
+                    nToClose=nToClose-1
+                    if nToClose<=0:
+                        bFound=True
+                        break
+                i+=1
+            tr=s[0:i]+')'
+    return tr
+
+
+
 if __name__ == "__main__":
     L="""
     mODULe WingTypes
@@ -125,21 +154,15 @@ if __name__ == "__main__":
     & or maybe not?'  ! That's a messed up "case!"
     
     tYPE T_patch
-        iNteger :: FirstPanel
         iNteger :: nChord
-        iNteger :: nSpan
         logical :: bEmit
-        logical :: bThick
         ! Geometry 
         real(MK) :: Area_Patch
         real(MK), dimension(:), pointer :: Area_Stripe =>null()
         ! Loads 
-        real(MK),dimension(:,:),pointer :: Cp  =>null()   !< Pressure coefficient
         real(MK),dimension(:,:),pointer :: StripeLoad  =>null()   !< Integrated Force over the "chord wise direction of the strip"
         real(MK),dimension(:,:),pointer :: StripeLoadPoint=>null()!< Point
-        real(MK), dimension(:), pointer :: Cl_Urel_Span_Force=>null()
         real(MK), dimension(:), pointer :: Cl_2D_Span_KJ =>null()
-        real(MK) :: Cl_2D_Wing_KJ
         real(MK) :: L_KJ
         ! NW Panels 
         integer, dimension(:), pointer :: INW => null() !< index of NW Panels attached to this patch (for now nSpan)

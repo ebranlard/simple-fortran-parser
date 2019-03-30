@@ -14,26 +14,20 @@ def main():
     def loc(path):
         return os.path.join(MyDir,path)
 
-    print(MyDir)
-
     F=FortranFile(loc('Interface.f90'))
-    F.read()
     F.write               (loc('Interface_gen.f90'))
     F.write_signatures    (loc('Interface.h'))
     F.write_signatures_def(loc('Interface.def'))
 
     F=FortranFile(loc('ProfileTypes.f90'))
-    F.read()
     F.write(loc('ProfileTypes_gen.f90'))
     F.write_type_tools(loc('ProfileAutoTools.f90'))
 
     # Regenerating files
     F=FortranFile(loc('ProfileTypes_gen.f90'))
-    F.read()
     F.write(loc('ProfileTypes_gen_gen.f90'))
 
     F=FortranFile(loc('Interface_gen.f90'))
-    F.read()
     F.write(loc('Interface_gen_gen.f90'))
     #F.write()
     #F.write_type_tools()
