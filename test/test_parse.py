@@ -357,6 +357,16 @@ bb  """
         self.assertEqual(L[0],'df_dx = (T1+T2+T3)')
 
 
+# --------------------------------------------------------------------------------}
+# --- def debug
+# --------------------------------------------------------------------------------{
+    def test_debug(self):
+        def loc(path):
+            return os.path.join(MyDir,path)
+        #F=FortranFile(loc('UglyTypes.f90'))
+        #print(F.tostring())
+        pass
+
 
 
 if __name__ == '__main__':

@@ -171,9 +171,11 @@ class FortranFile:
 
                 elif words_low[0]=='type':
                     if not bIsInMethod:
-                        if l.lower().find('save')>0 or l.find('::')>0:
-                            # TODO: type (XXX), save :: myvar  (in a module declaration)
-                            eprint('Warning: type attributes declaration not yet supported: '+l)
+                        if l_clean.lower().replace(' ','').find('type(')==0:
+                            if bIsInModule:
+                                m.append_raw(l,c)
+                            else:
+                                eprint('Warning: the following type declaration is not supported: '+l)
                         else:
                              # Creating a new type
                             t=FortranType(name=words_ori[1])
@@ -666,6 +668,7 @@ class FortranType:
     def __init__(self,raw_lines=None,name=None):
         # Raw data
         self.raw_lines=[]
+        self.raw_comments=[]
         self.raw_name=name
         # Main Data
         if name is not None:
@@ -681,7 +684,6 @@ class FortranType:
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-            self.raw_lines=raw_lines
             (lines,comments)=  bind_lines_with_comments(raw_lines);
             #for l,c in zip(lines,comments):
             #    print(l, '    ',c)
@@ -698,15 +700,18 @@ class FortranType:
             if lastline.find('end')<0:
                 raise Exception('Last line of type definition should start with `end`: ',lines[0])
 
-            self.Declarations = FortranDeclarations(lines=lines[1:-1],comments=comments[1:-1])
+            #self.Declarations = FortranDeclarations(lines=lines[1:-1],comments=comments[1:-1])
+            self.raw_lines    = lines[1:-1]
+            self.raw_comments = comments[1:-1]
             self.analyse_raw_data()
 
     def append(self,line,comment=''):
         self.raw_lines.append(line)
-        self.Declarations.append(FortranDeclaration(line,comment,inType=True))
+        self.raw_comments.append(comment)
 
     def analyse_raw_data(self):
-        #print(self.raw_lines)
+        self.Declarations=FortranDeclarations(lines=self.raw_lines,comments=self.raw_comments)
+        #self.Declarations.append(FortranDeclaration(line,comment,inType=True))
         for d in self.Declarations:
             if not d['built_in']:
                 self.dependencies.append(d['type'])
@@ -1381,7 +1386,7 @@ class FortranDeclarations(list):
         bDeclaration=i_dots>0
         return bDeclaration
         
-    def __init__(self,Declarations=[],lines=None,comments=None):
+    def __init__(self,Declarations=[],lines=None,comments=None,inType=False,argument=False):
         """ Initialize a list of declarations, Declarations is either:
              - a list of FortranDeclaration  
              - a list of strings
@@ -1408,6 +1413,10 @@ class FortranDeclarations(list):
         if lines is not None:
             self._parse(lines,comments)
 
+        for d in self:
+            d.IsArgument=argument
+            d.IsTypeDeclaration=inType
+
     def _parse(self,lines,comments):
         """ parse lines of declaration """
         for l,comment in zip(lines,comments):
@@ -1417,7 +1426,7 @@ class FortranDeclarations(list):
             else:
                 bDeclaration=FortranDeclarations.isDeclaration(l)
                 if not bDeclaration:
-                    raise Exception('Only declarations with `::` supported')
+                    raise Exception('Only declarations with `::` supported, but line is `{}`'.format(l))
                 # --- handling several varaibles declared on one line
                 i_dots=l.find('::');
                 l_before=l[0:i_dots].strip()

@@ -28,7 +28,7 @@ class Test(unittest.TestCase):
 #         F=FortranFile(loc('_TODO/VectorAnalysisStrides.f90'))
 #         F.write('_TODO/VectorAnalysisStrides_gen.f90')
 #         F=FortranFile(loc('_TODO/Wind.f90'))
-#         F.write('_TODO/Wind.f90')
+#         F.write('_TODO/Wind_gen.f90')
 #         F=FortranFile(loc('_TODO/fft.f90'))
 #         F.write('_TODO/fft_gen.f90')
 
