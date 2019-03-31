@@ -1,7 +1,7 @@
 .PHONY: test
 
-all:
-	python test/test_parse.py
+all: test
+	
 
 test:
 	python -m unittest discover

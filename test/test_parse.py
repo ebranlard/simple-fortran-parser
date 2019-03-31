@@ -30,17 +30,42 @@ class Test(unittest.TestCase):
                 f.write(a)
         self.assertEqual(a,b)
 
+# --------------------------------------------------------------------------------}
+# --- Program 
+# --------------------------------------------------------------------------------{
+    def test_program(self):
+        s="""program binary2Vtk
+    use PrecisionMod
+    implicit none
+    real :: x
+    integer :: i = 0
+    x=x+i
+contains
+    subroutine f()
+        write(*,*)'Hello'
+    end subroutine
+end program binary2Vtk"""
+        F    = FortranFile(lines = s)
+        sout = F.tostring(verbose = False)
+        self.assert_string(sout,s)
+
+# --------------------------------------------------------------------------------}
+# --- Module 
+# --------------------------------------------------------------------------------{
     def test_module(self):
         s="""module InterfaceLink
     use CStrings, only: cstring2fortran
     implicit none
 contains
-    subroutine io_term() BIND(C,name='io_term')
+    subroutine io_term() BIND(C, name='io_term')
         use HerbiVor
-        call herbivor_term(); 
+        call herbivor_term();
     end subroutine
-end module
-    """
+end module InterfaceLink"""
+        F    = FortranFile(lines = s)
+        sout = F.tostring(verbose = False)
+        self.assert_string(sout,s)
+
         s="""module ProfileTypes
     use MathConstants, only: NaN
     implicit none

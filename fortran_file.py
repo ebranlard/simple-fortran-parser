@@ -97,6 +97,7 @@ class FortranFile:
         # --------------------------------------------------------------------------------
         # --- Extracting Modules, types and Use Statements,
         #  really nasty I should have extracted modules only and then pass it around...
+        #  TODO this should be rewritten!
         # --------------------------------------------------------------------------------
         self.Modules=[]
         self.Routines=[]
@@ -115,6 +116,8 @@ class FortranFile:
 
             words=l.replace('  ',' ').split(' ')
             words_low=l.lower().split(' ')
+            # Detecting modules / programs 
+            # For now programs are treated like modules, except they have a different type
             if words[0].lower()=='module':
                 # This is a new module
                 m=(FortranModule(words[1]))
@@ -122,8 +125,13 @@ class FortranFile:
             elif words[0].lower()=='endmodule':
                 self.Modules.append(m)
                 bIsInModule=False
-
-            if 'subroutine' in words_low or 'function' in words_low :
+            elif words[0].lower()=='program':
+                m=(FortranProgram(words[1]))
+                bIsInModule=True
+            elif words[0].lower()=='endprogram':
+                self.Modules.append(m)
+                bIsInModule=False
+            elif 'subroutine' in words_low or 'function' in words_low :
                 # This is a new subroutine
                 s=(FortranMethod(raw_name=l))
                 bIsInMethod=True
@@ -174,8 +182,10 @@ class FortranFile:
                     t.append(l,c)
                 elif bIsInMethod:
                     s.append_raw(l,c)
-                #else:
-                #    print('Discarded line:',l)
+                elif bIsInModule:
+                    m.append_raw(l,c)
+                else:
+                    print('Discarded line:',l)
 
         if bIsInModule:
             raise Exception('No end of module found')
@@ -274,13 +284,13 @@ class FortranFile:
 
 
 
-
 # --------------------------------------------------------------------------------}
 # ---  Fortran Module
 # --------------------------------------------------------------------------------{
 class FortranModule:
     def __init__(self,name):
         self.name=name
+        self.type='module'
         # UseStatement
         self.UseStatements=FortranUseStatements([])
         # Types
@@ -289,16 +299,54 @@ class FortranModule:
         self.type_depend_mod=[]
         # Interfaces #TODO
         # Variables #TODO
+        self.Declarations=[]
+        self.Corpus=[]
         # Methods
         self.MethodList=[]
         # Misc
 
+        self._declarations_raw         = []
+        self._declarations_comment_raw = []
+        self._corpus_raw               = []
+        self._corpus_comment_raw       = []
+
+    def append_raw(self,line,comment):
+        if FortranDeclarations.isDeclaration(line):
+            self._declarations_raw.append(line)
+            self._declarations_comment_raw.append(comment)
+        else:
+            self._corpus_raw.append(line)
+            self._corpus_comment_raw.append(comment)
+
+
     def analyse_raw_data(self):
-        # Types
-        #print('MODULE: '+self.name)
+        #print(self.type+' '+self.name)
+        # --------------------------------------------------------------------------------}
+        # --- Analysing self corpus and declarations
+        # --------------------------------------------------------------------------------{
+        self.Declarations = FortranDeclarations(lines=self._declarations_raw,comments=self._declarations_comment_raw)
+        # --------------------------------------------------------------------------------}
+        # --- Corpus 
+        # --------------------------------------------------------------------------------{
+        # Removng some keywords that are handled automatically  
+        IPop=[]
+        for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
+            l=c.lower().replace(' ','')
+            if l.find('contains')==0:
+                IPop.append(i)
+            elif l.find('implicitnone')==0:
+                IPop.append(i)
+            elif l.find('module')==0 or l.find('program')==0:
+                IPop.append(i)
+            elif l.find('endmodule')==0 or l.find('endprogram')==0:
+                IPop.append(i)
+        for i in sorted(IPop, reverse=True):
+            del self._corpus_raw[i]
+            del self._corpus_comment_raw[i]
+
 
         # --------------------------------------------------------------------------------
-        # ---  Analysying sub elements
+        # ---  Analysig sub elements
         # --------------------------------------------------------------------------------
         # Analyse Types
         for t in self.TypeList:
@@ -357,7 +405,7 @@ class FortranModule:
     def tostring(self):
         """ Module to string """
         s=''
-        s+='module %s\n'%self.name
+        s+=self.type+ ' '+self.name+'\n'
         # Use statements
         s+=self.UseStatements.tostring(indent=INDENT)
         s+=INDENT+'implicit none\n'
@@ -366,13 +414,24 @@ class FortranModule:
             s+=t.tostring(INDENT)
             if i<len(self.TypeList)-1:
                 s+='\n'
+        ## Declarations
+        for i,d in enumerate(self.Declarations):
+            s+=d.tostring(INDENT)+'\n'
+        ## Corpus
+        for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
+            s+=INDENT+c
+            if len(cm)>0:
+                s+=' '+cm
+            s+='\n'
 
         ## Subroutines 
         if len(self.MethodList)>0:
             s+='contains\n'
-            for m in self.MethodList:
-                s+=m.tostring(indent=INDENT)+'\n'+'\n'
-        s+='end module %s'%self.name
+            for i,m in enumerate(self.MethodList):
+                s+=m.tostring(indent=INDENT)+'\n'
+                if i<len(self.MethodList)-1:
+                    s+='\n'
+        s+='end '+self.type+ ' '+self.name
         return s
 
     def write_to_file(self,f):
@@ -457,6 +516,17 @@ class FortranModule:
 
         f.write('end module %s\n'%get_type_tool_module(self.name))
 
+# --------------------------------------------------------------------------------}
+# ---  Fortran Program
+# --------------------------------------------------------------------------------{
+class FortranProgram(FortranModule):
+#     pass
+    def __init__(self,name):
+        FortranModule.__init__(self,name)
+        #super(FortranProgram,self).__init__(name)
+        self.type='program'
+
+
 
 # --------------------------------------------------------------------------------}
 # --- Fortran Use Statement
@@ -468,13 +538,12 @@ class FortranUseStatements(list):
              - a list of strings
              - a string
         """
-
         raw_lines=None
         # Check whether the use provided a list of statements
         if type(Statements) is list and (all([type(d) is FortranUseStatement for d in Statements])):
             super(FortranUseStatements,self).__init__(Statements)
         else:
-            super(FortranStatements,self).__init__([])
+            super(FortranUseStatements,self).__init__([])
             raw_lines=Statements if len(Statements)>0 else None
 
         if raw_lines is not None:
@@ -1098,8 +1167,7 @@ class FortranMethod(object):
             # Detecting Use statement
             bUseStatement=words[0].lower()=='use'
             # Detecting declaration
-            i_dots=l.find('::');
-            bDeclaration=i_dots>0
+            bDeclaration=FortranDeclarations.isDeclaration(l)
             if bDeclaration:
                 decl_lines.append(l)
                 decl_comments.append(comment)
@@ -1263,6 +1331,12 @@ class FortranFunction(FortranMethod):
 # --- Fortran declaration list  
 # --------------------------------------------------------------------------------{
 class FortranDeclarations(list):
+    @staticmethod
+    def isDeclaration(l):
+        i_dots=l.find('::');
+        bDeclaration=i_dots>0
+        return bDeclaration
+        
     def __init__(self,Declarations=[],lines=None,comments=None):
         """ Initialize a list of declarations, Declarations is either:
              - a list of FortranDeclaration  
@@ -1293,11 +1367,11 @@ class FortranDeclarations(list):
     def _parse(self,lines,comments):
         """ parse lines of declaration """
         for l,comment in zip(lines,comments):
-            i_dots=l.find('::');
-            bDeclaration=i_dots>0
+            bDeclaration=FortranDeclarations.isDeclaration(l)
             if not bDeclaration:
                 raise Exception('Only declarations with `::` supported')
             # --- handling several varaibles declared on one line
+            i_dots=l.find('::');
             l_before=l[0:i_dots].strip()
             l_after =l[i_dots+2:].strip()
             splits=l_after.split(',') 
