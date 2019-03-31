@@ -109,6 +109,10 @@ class FortranFile:
         s  = None
         ss = None
         t  = None
+
+        method_lines = []
+        type_lines   = []
+
         for (l,c) in zip(L,comments):
             # Skipping empty lines
             if len(l.strip())==0 and len(c.strip())==0:
@@ -139,26 +143,25 @@ class FortranFile:
                     bIsInModule=False
                 elif 'subroutine' in words_low or 'function' in words_low :
                     # This is a new subroutine
-                    s=(FortranMethod(raw_name=l))
+                    method_lines=[l+c]
                     bIsInMethod=True
                     if not bIsInModule:
                         bIsInStandalone=True
                         #print('Starting a standalone routine!',l)
-                elif words_low[0]=='endsubroutine':
+                elif words_low[0]=='endsubroutine' or words_low[0]=='endfunction':
+                    method_lines.append(l+c)
+                    #print('-------------------------------------------')
+                    #print('\n'.join(method_lines))
+                    #print('-------------------------------------------')
                     if bIsInModule:
-                        m.MethodList.append(s) 
+                        m.MethodList.append(FortranMethod(raw_lines=method_lines))
                         bIsInMethod=False
                     elif bIsInStandalone:
-                        self.Routines.append(s)
+                        self.Routines.append(FortranMethod(raw_lines=method_lines))
                     else:
                         eprint('Error, subroutine not in modules or not standalone!')
                         sys.exit(-1)
-                elif words_low[0]=='endfunction':
-                    if bIsInModule:
-                        m.MethodList.append(s)
-                        bIsInMethod=False
-                    else:
-                        self.Routines.append(s)
+                    method_lines=[]
                 elif words_low[0]=='use':
                     if (not bIsInModule) and (not bIsInStandalone):
                         eprint('Error, use statements found outside of module or subroutine!')
@@ -167,7 +170,7 @@ class FortranFile:
                         if not bIsInMethod :
                             m.UseStatements.append(FortranUseStatement(l,c))
                         else:
-                            s.append_raw(l,c)
+                            method_lines.append(l+c)
 
                 elif words_low[0]=='type':
                     if not bIsInMethod:
@@ -178,20 +181,22 @@ class FortranFile:
                                 eprint('Warning: the following type declaration is not supported: '+l)
                         else:
                              # Creating a new type
-                            t=FortranType(name=words_ori[1])
+                            type_lines=[l+c]
+                            #t=FortranType(name=words_ori[1])
                             bIsInType=True
                     else:
-                        s.append_raw(l,c)
+                        method_lines.append(l+c)
                 elif words_low[0]=='endtype':
-                    m.TypeList.append(t)
+                    type_lines.append(l+c)
+                    m.TypeList.append(FortranType(type_lines))
                     bIsInType=False
                 elif words_low[0]=='contains':
                     bIsContain=True
                 else:
                     if bIsInType:
-                        t.append(l,c)
+                        type_lines.append(l+c)
                     elif bIsInMethod:
-                        s.append_raw(l,c)
+                        method_lines.append(l+c)
                     elif bIsInModule:
                         if bIsContain:
                             # Comments inside the contain region are discarded for now
@@ -203,9 +208,9 @@ class FortranFile:
             else:
                 # Comment only line
                 if bIsInType:
-                    t.append(l,c)
+                    type_lines.append(l+c)
                 elif bIsInMethod:
-                    s.append_raw(l,c)
+                    method_lines.append(l+c)
                 elif bIsInModule:
                     if bIsContain:
                         # Comments inside the contain region are discarded for now
@@ -223,8 +228,8 @@ class FortranFile:
         # --------------------------------------------------------------------------------
         for m in self.Modules:
             m.analyse_raw_data()
-        for s in self.Routines:
-            s.analyse_raw_data()
+        #for s in self.Routines:
+        #    s.analyse_raw_data()
 #                     for l in t.raw_lines:
 #                         print(l)
 
@@ -381,12 +386,6 @@ class FortranModule:
             #print('TYPE: '+t.raw_name)
             t.analyse_raw_data()
             self.type_dependencies.append(t.dependencies)
-
-        # Analyse Methods
-        for m in self.MethodList:
-            #print('Analysing raw input for Method: '+m.name+m.raw_name)
-            m.analyse_raw_data()
-
 
         # --------------------------------------------------------------------------------
         # --- Type Dependencies
@@ -1097,10 +1096,11 @@ class FortranMethod(object):
 #             L = bind_lines(raw_lines);
 #             (L,comments) = remove_comments(L);
             (L,comments) = bind_lines_with_comments(raw_lines)
+            # TODO add safety here
             self.raw_name          = L[0]
             self.raw_lines         = L[1:-1]
             self.raw_comment_lines = comments[1:-1]
-            self.analyse_raw_data()
+            self._analyse_raw_data()
 
     def append_raw(self,line,comment=''):
         self.raw_lines.append(line)
@@ -1130,7 +1130,7 @@ class FortranMethod(object):
         else:
             self.arglist_str+=','+decl['varname']
 
-    def analyse_raw_data(self):
+    def _analyse_raw_data(self):
         self.UseStatements=FortranUseStatements([])
         # --------------------------------------------------------------------------------
         # ---  Analysing raw_name
