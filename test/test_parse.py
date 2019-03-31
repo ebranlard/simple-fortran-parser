@@ -71,19 +71,27 @@ end subroutine"""
         self.assert_string(s,sout)
 
         # --- FortranMethod - Subroutine directly parsed
-        print('------------------------')
+        #print('------------------------')
         M    = FortranMethod(raw_lines = s)
         sout = M.tostring(indent= '', verbose=False)
         self.assert_string(s,sout)
 
-        s="""subroutine io_term(x) BIND(C, name='io_term')
-    integer :: x
-    integer :: y
-    call herbivor_term(x,y)
-end subroutine"""
-        M    = FortranMethod(raw_lines = s)
         #     import pdb
         #     pdb.set_trace()
+        s="""subroutine profile_list_tostring(ProfileList,iunit_opt)
+    type(T_RefProfile), pointer :: ProfileList
+    integer, optional, intent(in) :: iunit_opt
+    type(T_RefProfile), pointer :: CurrentProfile
+    integer :: iprof
+    character(len=56) :: prefix
+    prefix=iprof+CurrentProfile
+end subroutine"""
+        M    = FortranMethod(raw_lines = s)
+        sout = M.tostring(indent= '', verbose=False)
+        self.assert_string(s,sout)
+#         print(M.tostring())
+
+
 
 # --------------------------------------------------------------------------------}
 # ---  
@@ -148,7 +156,21 @@ end subroutine"""
     integer :: nValues !< length of all polar vectors
     real(MK) :: Re !< Reynolds number
 end type"""
-        self.assert_string(FortranType(s).tostring().strip(),s)
+#         self.assert_string(FortranType(s).tostring().strip(),s)
+        s="""Type TgetWindSpeedData
+    real*8   ::    u_mean, &                          ! 10 min mean wind speed
+        tint, &                            ! turbulence intensity
+        wind_yaw_ang
+        end type"""
+        s_ref="""type TgetWindSpeedData
+    real*8 :: u_mean ! 10 min mean wind speed turbulence intensity
+    real*8 :: tint
+    real*8 :: wind_yaw_ang
+end type"""
+        self.assert_string(FortranType(s).tostring().strip(),s_ref)
+
+
+
 
 # --------------------------------------------------------------------------------}
 # --- Entitiy

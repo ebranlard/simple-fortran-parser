@@ -13,6 +13,78 @@ def line_not_supported_warning(line):
 
 
 
+# Bind fortran multiple lines
+def bind_lines_with_comments(lines):
+    parsed_lines=[];
+    comments=[];
+    bCat=False
+    line_cat=[];
+    #print('-----------------------------------------------------')
+    #print('\n'.join(lines))
+    #print('-----------------------------------------------------')
+    for line in lines:
+        line_not_supported_warning(line)
+        #print('>',line)
+        (l,comment)=split_comment(line)
+        #print('>>'+l+'<>'+comment+'<')
+        l=l.strip()
+        # If it's a comment, we cancel all
+        if len(l)>0:
+            if l[0]=='!':
+                if bCat:
+                    eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
+                    eprint('Previous line: ',line_cat)
+                    eprint('Current line: ',l)
+                    parsed_lines.append(line_cat)
+                    parsed_lines.append(l)
+                else:
+                    parsed_lines.append(l)
+                bCat=False
+                continue
+        if bCat:
+            # let's see if it's a fortran multiple line string
+            ll=l
+            if l[0]=='&':
+                ll=l[1:]
+            if ll[-1]=='&':
+                ll=l[:-1]
+                # we'll continue cating
+                bCat=True
+            else:
+                bCat=False
+            line_cat=line_cat+ll
+            com_cat+=comment[1:]
+            #print(' ')
+            #print('line cat:',line_cat)
+            #print('       l:',l)
+            #print('      ll:',ll,'bCat',bCat)
+            #print(' ')
+        else:
+            #  Initialization of line_cat
+            bCat=False
+            if len(l)>0:
+                if l[-1]=='&':
+                    bCat=True
+                    line_cat=l[:-1]
+                    com_cat =comment
+                else:
+                    line_cat=l
+                    com_cat =comment
+            else:
+                line_cat=''
+                com_cat =''
+        if not bCat:
+            if len(line_cat)>0:
+                parsed_lines.append(line_cat)
+                comments.append(com_cat)
+#                 print(line_cat)
+
+    return(parsed_lines,comments)
+
+
+
+
+
 
 # Bind fortran multiple lines
 def bind_lines(lines):
@@ -20,7 +92,7 @@ def bind_lines(lines):
     bCat=False
     line_cat=[];
     #print('-----------------------------------------------------')
-    #print(''.join(lines))
+    #print('\n'.join(lines))
     #print('-----------------------------------------------------')
     for line in lines:
         line_not_supported_warning(line)
@@ -84,7 +156,7 @@ def split_comment(line):
     if len(pos)>0:
         if pos[0]==0:
             # Trivial case, the whole line is a comment
-            l=[];
+            l='';
             
         else:
             # We neglect comments within string
@@ -106,9 +178,9 @@ def remove_comments(lines):
     comments=[];
     for line in lines:
         (l,comment)=split_comment(line)
-        if len(l)>0:
-            parsed_lines.append(l)
-            comments.append(comment)
+        #if len(l)>0:
+        parsed_lines.append(l)
+        comments.append(comment)
     return(parsed_lines,comments)
 
 

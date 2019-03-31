@@ -90,8 +90,9 @@ class FortranFile:
     def parse(self,Lines):
         if type(Lines) is not list:
             Lines=Lines.split('\n')
-        L = bind_lines(Lines);
-        (L,comments) = remove_comments(L);
+#         L = bind_lines(Lines);
+#         (L,comments) = remove_comments(L);
+        (L,comments) = bind_lines_with_comments(Lines)
         #print('\n'.join(L))
         # --------------------------------------------------------------------------------
         # --- Extracting Modules, types and Use Statements,
@@ -479,8 +480,9 @@ class FortranUseStatements(list):
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-            lines = bind_lines(raw_lines);
-            (lines,comments_new) = remove_comments(lines);
+#             lines = bind_lines(raw_lines);
+#             (lines,comments_new) = remove_comments(lines);
+            (L,comments) = bind_lines_with_comments(raw_lines)
             if len(comments)==0:
                 comments=comments_new
             elif len(comments)!=len(lines):
@@ -581,13 +583,17 @@ class FortranType:
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-            lines = bind_lines(raw_lines);
-            self.raw_lines=lines
-            (lines,comments) = remove_comments(lines);
+#             lines = bind_lines(raw_lines);
+            self.raw_lines=raw_lines
+#             (lines,comments) = remove_comments(lines);
+            (lines,comments)=  bind_lines_with_comments(raw_lines);
+            #for l,c in zip(lines,comments):
+            #    print(l, '    ',c)
 
+
+#             lines = bind_lines(lines);
             if len(lines)<=0:
                 return
-
             # extracting name
             words=lines[0].split()
             if len(words)<1 or words[0].lower()!='type':
@@ -598,11 +604,8 @@ class FortranType:
             if lastline.find('end')<0:
                 raise Exception('Last line of type definition should start with `end`: ',lines[0])
 
-
-            for l,c in zip(lines[1:-1],comments[1:-1]):
-                self.Declarations.append(FortranDeclaration(l,c,inType=True))
+            self.Declarations = FortranDeclarations(lines=lines[1:-1],comments=comments[1:-1])
             self.analyse_raw_data()
-
 
     def append(self,line,comment=''):
         self.raw_lines.append(line)
@@ -991,8 +994,9 @@ class FortranMethod(object):
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-            L = bind_lines(raw_lines);
-            (L,comments) = remove_comments(L);
+#             L = bind_lines(raw_lines);
+#             (L,comments) = remove_comments(L);
+            (L,comments) = bind_lines_with_comments(raw_lines)
             self.raw_name          = L[0]
             self.raw_lines         = L[1:-1]
             self.raw_comment_lines = comments[1:-1]
@@ -1121,10 +1125,10 @@ class FortranMethod(object):
             for i,d in enumerate(decl_stack):
                if d['varname'].lower()==arg_name.lower():
                    self.append_arg(d)
-                   decl_stack.pop(i)
                    bFound=True
-                   if len(d['intent'])<=0 and (not d['pointer']):
+                   if len(d['intent'])<=0 and (not d['pointer']) and (not d['ndimensions']>0) and (not d['optional']) and (not d['target']):
                        eprint('Warning: argument `{}` has no `intent` attributes in `{}`'.format(d['varname'],self.name))
+                   decl_stack.pop(i)
                    break
             # If not found that's an error
             if not bFound:
@@ -1280,8 +1284,9 @@ class FortranDeclarations(list):
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-            lines = bind_lines(raw_lines);
-            (lines,comments) = remove_comments(lines);
+            #lines = bind_lines(raw_lines);
+            #(lines,comments) = remove_comments(lines);
+            (lines,comments) = bind_lines_with_comments(raw_lines)
             
         if (lines is not None) and (type(lines) is not list):
             lines    = [lines]

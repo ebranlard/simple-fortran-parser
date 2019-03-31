@@ -13,6 +13,7 @@ import os, re
 import sys
 import argparse
 from fortran_file import*
+from stderr import *
 
 
 
@@ -47,7 +48,7 @@ def main(argv):
         out=''
     for filename in files:
         if opts.debug:
-            print('Processing: ',filename)
+            eprint('Processing: ',filename)
         process_file(filename,out, opts.verbose)
 
 
