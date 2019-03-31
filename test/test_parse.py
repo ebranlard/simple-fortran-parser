@@ -135,9 +135,20 @@ end subroutine"""
 # --- UseStatement 
 # --------------------------------------------------------------------------------{
     def test_use(self):
-        # test-multiline
+        s='use MyMod'
+        self.assert_string(FortranUseStatement(s).tostring().strip(),s)
         s='use MyMod, only: this, that ! comment'
         self.assert_string(FortranUseStatement(s).tostring().strip(),s)
+
+# --------------------------------------------------------------------------------}
+# --- Types
+# --------------------------------------------------------------------------------{
+    def test_type(self):
+        s="""type T_ProfilePolar
+    integer :: nValues !< length of all polar vectors
+    real(MK) :: Re !< Reynolds number
+end type"""
+        self.assert_string(FortranType(s).tostring().strip(),s)
 
 # --------------------------------------------------------------------------------}
 # --- Entitiy

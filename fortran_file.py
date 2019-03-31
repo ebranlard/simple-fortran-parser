@@ -161,7 +161,7 @@ class FortranFile:
                         eprint('Warning: type attributes declaration not yet supported: '+l)
                     else:
                          # Creating a new type
-                        t=FortranType(words[1])
+                        t=FortranType(name=words[1])
                         bIsInType=True
                 else:
                     s.append_raw(l,c)
@@ -274,6 +274,9 @@ class FortranFile:
 
 
 
+# --------------------------------------------------------------------------------}
+# ---  Fortran Module
+# --------------------------------------------------------------------------------{
 class FortranModule:
     def __init__(self,name):
         self.name=name
@@ -560,17 +563,46 @@ class FortranUseStatement(dict):
 # --- Fortran Type 
 # --------------------------------------------------------------------------------{
 class FortranType:
-    def __init__(self,name):
+    def __init__(self,raw_lines=None,name=None):
         # Raw data
         self.raw_lines=[]
         self.raw_name=name
-
-        # Derived data
-        self.bRecursive=False
         # Main Data
-        self.pretty_name=self.pretty_type(name)
+        if name is not None:
+            self.pretty_name=self.pretty_type(name)
+        else:
+            self.pretty_name=''
         self.dependencies=[]
         self.Declarations=[]
+        # Derived data
+        self.bRecursive=False
+
+        # If lines are provided, we parse directly
+        if raw_lines is not None:
+            if type(raw_lines) is not list:
+                raw_lines=raw_lines.split('\n')
+            lines = bind_lines(raw_lines);
+            self.raw_lines=lines
+            (lines,comments) = remove_comments(lines);
+
+            if len(lines)<=0:
+                return
+
+            # extracting name
+            words=lines[0].split()
+            if len(words)<1 or words[0].lower()!='type':
+                raise Exception('First line of type definition should start with `type`: ',lines[0])
+            self.raw_name = words[1]
+            self.name     = self.pretty_type(words[1])
+            lastline=''.join(lines[-1].split())
+            if lastline.find('end')<0:
+                raise Exception('Last line of type definition should start with `end`: ',lines[0])
+
+
+            for l,c in zip(lines[1:-1],comments[1:-1]):
+                self.Declarations.append(FortranDeclaration(l,c,inType=True))
+            self.analyse_raw_data()
+
 
     def append(self,line,comment=''):
         self.raw_lines.append(line)
@@ -587,10 +619,11 @@ class FortranType:
     def tostring(self, indent=''):
         """ Type to string"""
         s=''
-        s+='%stype %s\n'%(indent,self.raw_name)
-        for d in self.Declarations:
-            s+=d.tostring(indent+INDENT)+'\n'
-        s+=indent+'end type\n'
+        if self.raw_name is not None:
+            s+='%stype %s\n'%(indent,self.raw_name)
+            for d in self.Declarations:
+                s+=d.tostring(indent+INDENT)+'\n'
+            s+=indent+'end type\n'
         return s
 
     def write_to_file(self,f,indent=''):
@@ -1163,10 +1196,7 @@ class FortranMethod(object):
     def tostring(self, indent='    ',verbose=False):
         """ Routine to string """
         s=''
-        s+=''
-        # --------------------------------------------------------------------------------
-        # --- Writting the fortran signature of the method
-        # --------------------------------------------------------------------------------
+        # --- method's signature
         goodies_before=''
         goodies_after=''
         if self.bRecursive:
@@ -1178,15 +1208,12 @@ class FortranMethod(object):
                    goodies_after+=' BIND(C, name=\'%s\')'%self.bind_name
 
         s+='%s%s%s %s(%s)%s\n'%(indent,goodies_before,self.type,self.name,self.arglist_str,goodies_after)
-        # --------------------------------------------------------------------------------
+
         # ---  Use statements
-        # --------------------------------------------------------------------------------
         s+=self.UseStatements.tostring(INDENT+indent)
-        # --------------------------------------------------------------------------------
+
         # ---  Arguments and variable declaration
-        # --------------------------------------------------------------------------------
-        # deleting unused variables
-        self.remove_unused_var()
+        self.remove_unused_var() # deleting unused variables
 
         if len(self.arglist)>0:
             if verbose:
@@ -1207,13 +1234,11 @@ class FortranMethod(object):
                 if len(l)>0:
                     for ll in l.split('\n'):
                         s+='%s%s\n'%(indent+INDENT,ll)
-        #f.write('%send %s %s\n\n'%(indent,self.type,self.name))
         s+='%send %s'%(indent,self.type)
         return s
 
     def write_to_file(self,f,indent='    '):
-        s=self.tostring(indent)
-        f.write(s)
+        f.write(self.tostring(indent))
 
     # A kind of hack
     def write_to_file_inout(self,f,indent='    '):
@@ -1235,6 +1260,9 @@ class FortranFunction(FortranMethod):
         super(FortranFunction,self).__init__(name)
         self.type='function'
 
+# --------------------------------------------------------------------------------}
+# --- Fortran declaration list  
+# --------------------------------------------------------------------------------{
 class FortranDeclarations(list):
     def __init__(self,Declarations=[],lines=None,comments=None):
         """ Initialize a list of declarations, Declarations is either:
@@ -1260,10 +1288,9 @@ class FortranDeclarations(list):
             comments = [comments]
 
         if lines is not None:
-            self.parse(lines,comments)
+            self._parse(lines,comments)
 
-
-    def parse(self,lines,comments):
+    def _parse(self,lines,comments):
         """ parse lines of declaration """
         for l,comment in zip(lines,comments):
             i_dots=l.find('::');
