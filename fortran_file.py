@@ -446,11 +446,11 @@ class FortranModule:
 #         if len(self.Declarations)>0:
         ## Corpus
         for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
-            s+=reindent(c,INDENT)
+            ss=c
             if len(cm)>0 and len(c)>0:
-                s+=' '
-            s+=cm
-            s+='\n'
+                ss+=' '
+            ss+=cm
+            s+=reindent(ss,INDENT)+'\n'
 
         ## Subroutines 
         if len(self.MethodList)>0:

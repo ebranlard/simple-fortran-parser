@@ -154,23 +154,24 @@ def split_comment(line):
     pos=find_pos(line,'!')
     comment=''
     l=line
-    if len(pos)>0:
-        if pos[0]==0:
-            # Trivial case, the whole line is a comment
-            l='';
-            comment=line.rstrip()
-        else:
-            # We neglect comments within string
-            i=0
-            bOK=False
-            while i<len(pos):
-                if not is_in_quotes(line,pos[i]):
-                    bOK=True
-                    break
-                i=i+1
-            if bOK:
-                comment=l[(pos[i]):].rstrip() # Stripping comment but not line
-                l=l[:(pos[i])].rstrip()
+    l_strip=l.strip()
+    pos_strip=find_pos(l_strip,'!')
+    if len(pos_strip)>0 and pos_strip[0]==0:
+        # Trivial case, it's a pure comment, we keep the indentation!
+        l='';
+        comment=line.rstrip()
+    else:
+        # We neglect comments within string
+        i=0
+        bOK=False
+        while i<len(pos):
+            if not is_in_quotes(line,pos[i]):
+                bOK=True
+                break
+            i=i+1
+        if bOK:
+            comment=l[(pos[i]):].rstrip() # Stripping comment but not line
+            l=l[:(pos[i])].rstrip()
     return l,comment
 
 
