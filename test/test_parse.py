@@ -54,42 +54,42 @@ end program binary2Vtk"""
 # --- Module 
 # --------------------------------------------------------------------------------{
     def test_module(self):
-        s="""module InterfaceLink
-    use CStrings, only: cstring2fortran
-    implicit none
-contains
-    subroutine io_term() BIND(C, name='io_term')
-        use HerbiVor
-        call herbivor_term();
-    end subroutine
-end module InterfaceLink"""
-        F    = FortranFile(lines = s)
-        sout = F.tostring(verbose = False)
-        self.assert_string(sout,s)
-
+#         s="""module InterfaceLink
+#     use CStrings, only: cstring2fortran
+#     implicit none
+# contains
+#     subroutine io_term() BIND(C, name='io_term')
+#         use HerbiVor
+#         call herbivor_term();
+#     end subroutine
+# end module InterfaceLink"""
+#         F    = FortranFile(lines = s)
+#         sout = F.tostring(verbose = False)
+#         self.assert_string(sout,s)
+# 
+#         s="""module ProfileTypes
+#     use MathConstants, only: NaN
+#     implicit none
+#     type T_ProfilePolar
+#         integer :: nValues !< length of all polar vectors
+#         real(MK) :: Re !< Reynolds number
+#     end type
+# end module ProfileTypes"""
+#         F    = FortranFile(lines = s)
+#         sout = F.tostring(verbose = False)
+#         self.assert_string(sout,s)
         s="""module ProfileTypes
     use MathConstants, only: NaN
     implicit none
     type T_ProfilePolar
         integer :: nValues !< length of all polar vectors
         real(MK) :: Re !< Reynolds number
+        real(PROFILE_POLAR_KIND), dimension(:), pointer :: alpha => null() !< Angle of attack in degrees from -XX to XX
     end type
 end module ProfileTypes"""
         F    = FortranFile(lines = s)
         sout = F.tostring(verbose = False)
         self.assert_string(sout,s)
-#         s=""" module ProfileTypes
-#     use MathConstants, only: NaN
-#     implicit none
-#     type T_ProfilePolar
-#         integer :: nValues !< length of all polar vectors
-#         real(MK) :: Re !< Reynolds number
-#         real(PROFILE_POLAR_KIND), dimension(:), pointer :: alpha => null() !< Angle of attack in degrees from -XX to XX
-#     end type
-# end module"""
-#         F    = FortranFile(lines = s)
-#         sout = F.tostring(verbose = False)
-#         self.assert_string(sout,s)
 
 
     def test_function(self):

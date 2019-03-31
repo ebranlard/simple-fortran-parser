@@ -40,32 +40,6 @@ module ProfileTypes
         real(MK) :: thickness_max=NaN
     end type
 
-    type T_RefProfile
-        real(MK):: thickness_rel=NaN  !< Relative thickness of the profile in percentage (0-100)
-        real(MK):: pos_rel=NaN    !< Relative spanwise position of the profile
-        integer :: nPolars=0      !< A reference profile can have different polars depending on: Re, clean, numeric/experim
-        integer :: nGeometries=0  !< A reference profile can have different geometries (icing, deformed)
-        type(T_ProfilePolar),dimension(:), pointer :: Polars=>null()
-        type(T_ProfileGeometry),dimension(:), pointer :: Geometries=>null()
-        ! allow the type to be used as a list
-        type(T_RefProfile),pointer :: next =>null()
-        integer :: n_list=-1 !< not, pretty, but the head will store the size of the list
-    end type
-    
-    type T_ProfileSection 
-        real(MK) :: chord !<
-        real(MK) :: thickness_rel !<
-
-        type(T_ProfilePolar),pointer    :: CurrentPolar=>null() !< 
-        type(T_ProfileGeometry),pointer :: Geometry=>null()
-        ! Reference profiles used for computing performance of current profile
-        integer                    :: nRefProfiles              !< number of ref. profile (1 or 2)
-        type(T_RefProfile),pointer :: pRefProfilePrev  =>null()   !< Profile Pref than current one - ALIAS
-        type(T_RefProfile),pointer :: pRefProfileNext  =>null()   !< Profile Next than current one - ALIAS
-        integer                    :: iRefProfilePrev       !< Index in the Profile database
-        integer                    :: iRefProfileNext        !< Index in the Profile database
-       
-    end type
 
     ! hawc type 
 !      Type Tprofdata

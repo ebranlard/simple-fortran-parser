@@ -18,7 +18,12 @@ def main():
     F.write               (loc('Interface_gen.f90'))
     F.write_signatures    (loc('Interface.h'))
     F.write_signatures_def(loc('Interface.def'))
+    # Regenerating files
+    F=FortranFile(loc('Interface_gen.f90'))
+    F.write(loc('Interface_gen_gen.f90'))
 
+
+    #
     F=FortranFile(loc('ProfileTypes.f90'))
     F.write(loc('ProfileTypes_gen.f90'))
     F.write_type_tools(loc('ProfileAutoTools.f90'))
@@ -27,8 +32,6 @@ def main():
     F=FortranFile(loc('ProfileTypes_gen.f90'))
     F.write(loc('ProfileTypes_gen_gen.f90'))
 
-    F=FortranFile(loc('Interface_gen.f90'))
-    F.write(loc('Interface_gen_gen.f90'))
     #F.write()
     #F.write_type_tools()
     #F.write_signatures_def()

@@ -110,6 +110,10 @@ class FortranFile:
         ss = None
         t  = None
         for (l,c) in zip(L,comments):
+            # Skipping empty lines
+            if len(l.strip())==0 and len(c.strip())==0:
+                continue
+
             # always concatenate end with the keyword
             if l[0:4].lower()=='end ':
                 l='end'+l[4:]
@@ -685,6 +689,7 @@ class FortranType:
         self.Declarations.append(FortranDeclaration(line,comment,inType=True))
 
     def analyse_raw_data(self):
+        #print(self.raw_lines)
         for d in self.Declarations:
             if not d['built_in']:
                 self.dependencies.append(d['type'])
@@ -1588,7 +1593,7 @@ class FortranDeclaration(dict):
         if len(self['comment'])>0:
             if len(attributes)>0:
                 attributes+=' '
-        attributes+=self['comment']
+        attributes+=self['comment'].strip()
 
         s+=indent+attributes
         return s
