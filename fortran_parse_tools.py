@@ -48,12 +48,12 @@ def bind_lines_with_comments(lines):
             if l[0]=='&':
                 ll=l[1:]
             if ll[-1]=='&':
-                ll=l[:-1]
+                ll=ll[:-1]
                 # we'll continue cating
                 bCat=True
             else:
                 bCat=False
-            line_cat=line_cat+ll
+            line_cat=line_cat+ll.lstrip()
             com_cat+=comment[1:]
             #print(' ')
             #print('line cat:',line_cat)
@@ -63,17 +63,14 @@ def bind_lines_with_comments(lines):
         else:
             #  Initialization of line_cat
             bCat=False
-            if len(l)>0:
-                if l[-1]=='&':
-                    bCat=True
-                    line_cat=l_ori[:-1]
-                    com_cat =comment
-                else:
-                    line_cat=l_ori
-                    com_cat =comment
+            if l_ori[-1]=='&':
+                bCat=True
+                line_cat=l_ori[:-1]
+                com_cat =comment
             else:
-                line_cat=''
-                com_cat =''
+                line_cat=l_ori
+                com_cat =comment
+            #print('>>> STARTING',line_cat, '  >'+l_ori[-1]+'<' )
         if not bCat:
             if len(line_cat)>0:
                 parsed_lines.append(line_cat)

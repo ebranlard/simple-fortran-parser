@@ -350,6 +350,14 @@ bb  """
         self.assertEqual(L[0],'s="aa""bb"')
         self.assertEqual(C[0],'! my com')
 
+        s="""df_dx = (T1+&
+    & T2+& 
+    & T3)"""
+        (L,C)=bind_lines_with_comments(s.split('\n'))
+        self.assertEqual(L[0],'df_dx = (T1+T2+T3)')
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
