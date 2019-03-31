@@ -113,77 +113,93 @@ class FortranFile:
             # Skipping empty lines
             if len(l.strip())==0 and len(c.strip())==0:
                 continue
+            
+            l_clean=l.strip()
 
             # always concatenate end with the keyword
-            if l[0:4].lower()=='end ':
-                l='end'+l[4:]
+            if l_clean.strip()[0:4].lower()=='end ':
+                l_clean='end'+l_clean[4:]
+            words_ori = l_clean.split()
+            words_low = l_clean.lower().split()
+            if len(words_low)>0:
+                # Detecting modules / programs 
+                # For now programs are treated like modules, except they have a different type
+                if words_low[0]=='module':
+                    # This is a new module
+                    m=(FortranModule(words_ori[1]))
+                    bIsInModule=True
+                elif words_low[0]=='endmodule':
+                    self.Modules.append(m)
+                    bIsInModule=False
+                elif words_low[0]=='program':
+                    m=(FortranProgram(words_ori[1]))
+                    bIsInModule=True
+                elif words_low[0]=='endprogram':
+                    self.Modules.append(m)
+                    bIsInModule=False
+                elif 'subroutine' in words_low or 'function' in words_low :
+                    # This is a new subroutine
+                    s=(FortranMethod(raw_name=l))
+                    bIsInMethod=True
+                    if not bIsInModule:
+                        bIsInStandalone=True
+                        #print('Starting a standalone routine!',l)
+                elif words_low[0]=='endsubroutine':
+                    if bIsInModule:
+                        m.MethodList.append(s) 
+                        bIsInMethod=False
+                    elif bIsInStandalone:
+                        self.Routines.append(s)
+                    else:
+                        eprint('Error, subroutine not in modules or not standalone!')
+                        sys.exit(-1)
+                elif words_low[0]=='endfunction':
+                    if bIsInModule:
+                        m.MethodList.append(s)
+                        bIsInMethod=False
+                    else:
+                        self.Routines.append(s)
+                elif words_low[0]=='use':
+                    if (not bIsInModule) and (not bIsInStandalone):
+                        eprint('Error, use statements found outside of module or subroutine!')
+                        eprint('    line:  ',l)
+                    else:
+                        if not bIsInMethod :
+                            m.UseStatements.append(FortranUseStatement(l,c))
+                        else:
+                            s.append_raw(l,c)
 
-            words=l.replace('  ',' ').split(' ')
-            words_low=l.lower().split(' ')
-            # Detecting modules / programs 
-            # For now programs are treated like modules, except they have a different type
-            if words[0].lower()=='module':
-                # This is a new module
-                m=(FortranModule(words[1]))
-                bIsInModule=True
-            elif words[0].lower()=='endmodule':
-                self.Modules.append(m)
-                bIsInModule=False
-            elif words[0].lower()=='program':
-                m=(FortranProgram(words[1]))
-                bIsInModule=True
-            elif words[0].lower()=='endprogram':
-                self.Modules.append(m)
-                bIsInModule=False
-            elif 'subroutine' in words_low or 'function' in words_low :
-                # This is a new subroutine
-                s=(FortranMethod(raw_name=l))
-                bIsInMethod=True
-                if not bIsInModule:
-                    bIsInStandalone=True
-                    #print('Starting a standalone routine!',l)
-            elif words[0].lower()=='endsubroutine':
-                if bIsInModule:
-                    m.MethodList.append(s) 
-                    bIsInMethod=False
-                elif bIsInStandalone:
-                    self.Routines.append(s)
-                else:
-                    eprint('Error, subroutine not in modules or not standalone!')
-                    sys.exit(-1)
-            elif words[0].lower()=='endfunction':
-                if bIsInModule:
-                    m.MethodList.append(s)
-                    bIsInMethod=False
-                else:
-                    self.Routines.append(s)
-            elif words[0].lower()=='use':
-                if (not bIsInModule) and (not bIsInStandalone):
-                    eprint('Error, use statements found outside of module or subroutine!')
-                    eprint('    line:  ',l)
-                else:
-                    if not bIsInMethod :
-                        m.UseStatements.append(FortranUseStatement(l,c))
+                elif words_low[0]=='type':
+                    if not bIsInMethod:
+                        if l.lower().find('save')>0 or l.find('::')>0:
+                            # TODO: type (XXX), save :: myvar  (in a module declaration)
+                            eprint('Warning: type attributes declaration not yet supported: '+l)
+                        else:
+                             # Creating a new type
+                            t=FortranType(name=words_ori[1])
+                            bIsInType=True
                     else:
                         s.append_raw(l,c)
-
-            elif words[0].lower()=='type':
-                if not bIsInMethod:
-                    if l.find('save')>0 or l.find('::')>0:
-                        # TODO: type (XXX), save :: myvar  (in a module declaration)
-                        eprint('Warning: type attributes declaration not yet supported: '+l)
-                    else:
-                         # Creating a new type
-                        t=FortranType(name=words[1])
-                        bIsInType=True
+                elif words_low[0]=='endtype':
+                    m.TypeList.append(t)
+                    bIsInType=False
+                elif words_low[0]=='contains':
+                    bIsContain=True
                 else:
-                    s.append_raw(l,c)
-            elif words[0].lower()=='endtype':
-                m.TypeList.append(t)
-                bIsInType=False
-            elif words[0].lower()=='contains':
-                bIsContain=True
+                    if bIsInType:
+                        t.append(l,c)
+                    elif bIsInMethod:
+                        s.append_raw(l,c)
+                    elif bIsInModule:
+                        if bIsContain:
+                            # Comments inside the contain region are discarded for now
+                            pass
+                        else:
+                            m.append_raw(l,c)
+                    else:
+                        print('Discarded line:',l)
             else:
+                # Comment only line
                 if bIsInType:
                     t.append(l,c)
                 elif bIsInMethod:
@@ -195,7 +211,7 @@ class FortranFile:
                     else:
                         m.append_raw(l,c)
                 else:
-                    print('Discarded line:',l)
+                    print('Discarded line:',l,c)
 
         if bIsInModule:
             raise Exception('No end of module found')
@@ -430,7 +446,7 @@ class FortranModule:
 #         if len(self.Declarations)>0:
         ## Corpus
         for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
-            s+=INDENT+c
+            s+=reindent(c,INDENT)
             if len(cm)>0 and len(c)>0:
                 s+=' '
             s+=cm
@@ -616,6 +632,7 @@ class FortranUseStatement(dict):
                 module=True,\
                 only_list=[],\
                 comment='')
+        line=line.strip()
         # --- Splitting comment
         if len(comment)==0:
             (line,comment) = split_comment(line);
@@ -1194,7 +1211,7 @@ class FortranMethod(object):
                 self.UseStatements.append(FortranUseStatement(l,comment))
                 #print(l)
             else:
-                self.append_corpus(l,comment) # TODO append line not l
+                self.append_corpus(line,comment)
 #             if pattern_intent_in.match(l):
 #             pass
         # --------------------------------------------------------------------------------
@@ -1327,7 +1344,7 @@ class FortranMethod(object):
             for l in self.corpus:
                 if len(l)>0:
                     for ll in l.split('\n'):
-                        s+='%s%s\n'%(indent+INDENT,ll)
+                        s+=reindent(ll,indent+INDENT)+'\n'
         s+='%send %s'%(indent,self.type)
         return s
 

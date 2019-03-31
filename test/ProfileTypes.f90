@@ -17,27 +17,27 @@ module ProfileTypes
     type T_ProfileGeometry
         logical :: bFlatBack = .false. !< Is it a Flat back airfoil
         ! input data
-        integer :: n_in = -1 !< dimension of x_in and y_in below 
+        integer :: n_in = -1 !< dimension of x_in and y_in below
         real(MK), dimension(:), pointer :: x_in => null()
         real(MK), dimension(:), pointer :: y_in => null()
         ! normalized data, have to include the LE and TE points
-        integer :: n_c = -1 !< dimension of x and y below 
+        integer :: n_c = -1 !< dimension of x and y below
         real(MK), dimension(:), pointer :: x_c => null() !< x/c geometry coordinates, LE is x=, TE is x=
         real(MK), dimension(:), pointer :: y_c => null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
         ! Data in Body coordinate, scaled with chord, twisted. etc.
-        integer :: n = -1 !< dimension of x_in and y_in below 
+        integer :: n = -1 !< dimension of x_in and y_in below
         real(MK), dimension(:), pointer :: x => null() !< x/c geometry coordinates, LE is x=, TE is x=
         real(MK), dimension(:), pointer :: y => null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
         !
         real(MK) :: iLE !< index of LE point in x,y vectors
         real(MK) :: iTE !< index of TE point in x,y vectors
         ! "Linear theory variables"
-        integer ::nMean_c= -1 !< dimension of x_mean_c and y_mean_c below
-        real(MK),dimension(:),pointer :: x_mean_c=>null() !< x Coordinate mean chord line, going from LE to TE
-        real(MK),dimension(:),pointer :: y_mean_c=>null() !< 
-        real(MK),dimension(:),pointer :: thickness_mean_c =>null()!< 
-        real(MK) :: camber=NaN
-        real(MK) :: thickness_max=NaN
+        integer :: nMean_c = -1 !< dimension of x_mean_c and y_mean_c below
+        real(MK), dimension(:), pointer :: x_mean_c => null() !< x Coordinate mean chord line, going from LE to TE
+        real(MK), dimension(:), pointer :: y_mean_c => null() !<
+        real(MK), dimension(:), pointer :: thickness_mean_c => null() !<
+        real(MK) :: camber = NaN
+        real(MK) :: thickness_max = NaN
     end type
 
 

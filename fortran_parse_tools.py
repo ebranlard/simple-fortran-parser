@@ -12,7 +12,6 @@ def line_not_supported_warning(line):
             eprint(line)
 
 
-
 # Bind fortran multiple lines
 def bind_lines_with_comments(lines):
     parsed_lines=[];
@@ -25,20 +24,22 @@ def bind_lines_with_comments(lines):
     for line in lines:
         line_not_supported_warning(line)
         #print('>',line)
-        (l,comment)=split_comment(line)
+        (l_ori,comment)=split_comment(line)
+        comment=comment.rstrip()
         #print('>>'+l+'<>'+comment+'<')
-        l=l.strip()
+        l_ori = l_ori.rstrip()
+        l     = l_ori.strip()
         # If it's a comment, we cancel all
         if len(l)==0:
             if bCat:
                 eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
                 eprint('Previous line: ',line_cat)
-                eprint('Current line: ',l)
+                eprint('Current line: ',l_ori)
                 parsed_lines.append(line_cat)
-                parsed_lines.append(l)
+                parsed_lines.append(l_ori)
             else:
                 parsed_lines.append('')
-                comments.append(line.strip())
+                comments.append(comment)
             bCat=False
             continue
         if bCat:
@@ -65,10 +66,10 @@ def bind_lines_with_comments(lines):
             if len(l)>0:
                 if l[-1]=='&':
                     bCat=True
-                    line_cat=l[:-1]
+                    line_cat=l_ori[:-1]
                     com_cat =comment
                 else:
-                    line_cat=l
+                    line_cat=l_ori
                     com_cat =comment
             else:
                 line_cat=''
@@ -84,67 +85,67 @@ def bind_lines_with_comments(lines):
 
 
 
-
-
-# Bind fortran multiple lines
-def bind_lines(lines):
-    parsed_lines=[];
-    bCat=False
-    line_cat=[];
-    #print('-----------------------------------------------------')
-    #print('\n'.join(lines))
-    #print('-----------------------------------------------------')
-    for line in lines:
-        line_not_supported_warning(line)
-        l=line.strip()
-        # If it's a comment, we cancel all
-        if len(l)>0:
-            if l[0]=='!':
-                if bCat:
-                    eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
-                    eprint('Previous line: ',line_cat)
-                    eprint('Current line: ',l)
-                    parsed_lines.append(line_cat)
-                    parsed_lines.append(l)
-                else:
-                    parsed_lines.append(l)
-                bCat=False
-                continue
-        if bCat:
-            # let's see if it's a fortran multiple line string
-            ll=l
-            if l[0]=='&':
-                ll=l[1:]
-            if ll[-1]=='&':
-                ll=l[:-1]
-                # we'll continue cating
-                bCat=True
-            else:
-                bCat=False
-            line_cat=line_cat+ll
-            #print(' ')
-            #print('line cat:',line_cat)
-            #print('       l:',l)
-            #print('      ll:',ll,'bCat',bCat)
-            #print(' ')
-        else:
-            #  Initialization of line_cat
-            bCat=False
-            if len(l)>0:
-                if l[-1]=='&':
-                    bCat=True
-                    line_cat=l[:-1]
-                else:
-                    line_cat=l
-            else:
-                line_cat=''
-        if not bCat:
-            if len(line_cat)>0:
-                parsed_lines.append(line_cat)
-#                 print(line_cat)
-
-    return(parsed_lines)
-
+# 
+# 
+# # Bind fortran multiple lines
+# def bind_lines(lines):
+#     parsed_lines=[];
+#     bCat=False
+#     line_cat=[];
+#     #print('-----------------------------------------------------')
+#     #print('\n'.join(lines))
+#     #print('-----------------------------------------------------')
+#     for line in lines:
+#         line_not_supported_warning(line)
+#         l=line.strip()
+#         # If it's a comment, we cancel all
+#         if len(l)>0:
+#             if l[0]=='!':
+#                 if bCat:
+#                     eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
+#                     eprint('Previous line: ',line_cat)
+#                     eprint('Current line: ',line)
+#                     parsed_lines.append(line_cat)
+#                     parsed_lines.append(l)
+#                 else:
+#                     parsed_lines.append(l)
+#                 bCat=False
+#                 continue
+#         if bCat:
+#             # let's see if it's a fortran multiple line string
+#             ll=l
+#             if l[0]=='&':
+#                 ll=l[1:]
+#             if ll[-1]=='&':
+#                 ll=l[:-1]
+#                 # we'll continue cating
+#                 bCat=True
+#             else:
+#                 bCat=False
+#             line_cat=line_cat+ll
+#             #print(' ')
+#             #print('line cat:',line_cat)
+#             #print('       l:',l)
+#             #print('      ll:',ll,'bCat',bCat)
+#             #print(' ')
+#         else:
+#             #  Initialization of line_cat
+#             bCat=False
+#             if len(l)>0:
+#                 if l[-1]=='&':
+#                     bCat=True
+#                     line_cat=l[:-1]
+#                 else:
+#                     line_cat=l
+#             else:
+#                 line_cat=''
+#         if not bCat:
+#             if len(line_cat)>0:
+#                 parsed_lines.append(line_cat)
+# #                 print(line_cat)
+# 
+#     return(parsed_lines)
+# 
 # Remove fortran comments from lines
 # The case of comment after multiple line string is not supported
 
@@ -157,7 +158,7 @@ def split_comment(line):
         if pos[0]==0:
             # Trivial case, the whole line is a comment
             l='';
-            
+            comment=line.rstrip()
         else:
             # We neglect comments within string
             i=0
@@ -168,8 +169,8 @@ def split_comment(line):
                     break
                 i=i+1
             if bOK:
-                comment=l[(pos[i]):].strip()
-                l=l[:(pos[i])]
+                comment=l[(pos[i]):].rstrip() # Stripping comment but not line
+                l=l[:(pos[i])].rstrip()
     return l,comment
 
 
@@ -227,6 +228,17 @@ def split_entities(s):
             break
 
     return splits
+
+def reindent(s,indent):
+    """ reindent s assuming s has already some indent """
+    nindent=len(indent)
+    nleading=len(s)-len(s.lstrip())
+    if nleading<nindent:
+        return indent+s
+    else:
+        return indent+s[nindent:]
+
+
 
 
 

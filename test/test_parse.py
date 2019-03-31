@@ -283,7 +283,34 @@ end type"""
 # --------------------------------------------------------------------------------}
 # --- Split comments
 # --------------------------------------------------------------------------------{
+    def test_split(self):
+        s=''
+        self.assertEqual(split_comment(s),('',''))
+        s='  hello'
+        self.assertEqual(split_comment(s),('  hello',''))
+        s='!'
+        self.assertEqual(split_comment(s),('','!'))
+        s='! hi '
+        self.assertEqual(split_comment(s),('','! hi'))
+        s='hello ! hi'
+        self.assertEqual(split_comment(s),('hello','! hi'))
+        s='  hello ! hi'
+        self.assertEqual(split_comment(s),('  hello','! hi'))
+        s='hello="!not" ! hi'
+        self.assertEqual(split_comment(s),('hello="!not"','! hi'))
 
+# --------------------------------------------------------------------------------}
+# --- Indent 
+# --------------------------------------------------------------------------------{
+    def test_indent(self):
+        s=''
+        self.assertEqual(reindent(s,'    '),'    ')
+        s='aa'
+        self.assertEqual(reindent(s,'    '),'    aa')
+        s='    aa'
+        self.assertEqual(reindent(s,'    '),'    aa')
+        s='        aa'
+        self.assertEqual(reindent(s,'    '),'        aa')
 
 if __name__ == '__main__':
     unittest.main()
