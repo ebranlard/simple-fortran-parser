@@ -9,29 +9,29 @@ contains
 
     subroutine io_term() BIND(C,name='io_term')
         use HerbiVor
-        call herbivor_term(); 
+        call herbivor_term();
     end subroutine
     
     !> Returns 1 if library has no error
-    integer(C_INT) function check() BIND(C,name='check')
+    integer(C_INT) function check() BIND(C, name='check')
         use PrecisionMod, only: C_INT
         use HerbiVorErrorState, only: is_herbivor_in_error_state
         !
         check=int(1,C_INT)
         if(is_herbivor_in_error_state()) then
-            check=int(0,C_INT); 
+            check=int(0,C_INT);
             !print*,'Library in error state'
         endif
     end function
 
     !> Returns 1 if library has no error
-    subroutine error_solved() BIND(C,name='error_solved')
+    subroutine error_solved() BIND(C, name='error_solved')
         use HerbiVorErrorState, only: set_herbivor_error_state
         call set_herbivor_error_state(.false.)
     end subroutine
 
     !> Getting a string variable
-    subroutine io_set_output_to_std(flag_c) BIND(C, NAME='io_set_output_to_std')
+    subroutine io_set_output_to_std(flag_c) BIND(C, name='io_set_output_to_std')
         use HerbiVorIO, only: set_output_to_std
         use PrecisionMod,only:C_INT
         !
@@ -42,7 +42,7 @@ contains
 
 
     !> Setting a number variable
-    subroutine io_set_var(svar_c,rval) BIND(C, NAME='io_set_var')
+    subroutine io_set_var(svar_c,rval) BIND(C, name='io_set_var')
         use CStrings, only: cstring2fortran
         use HerbiVorIO, only: log_error,log_info
         use HerbiVorIO, only: bdebug_set_triggers
@@ -64,7 +64,7 @@ contains
 
 
     !> Getting HerbiVor version
-    subroutine io_print_version() BIND(C,name='io_print_version')
+    subroutine io_print_version() BIND(C, name='io_print_version')
         use HerbiVorLink, only: herbivor_print_version_no_log
         call herbivor_print_version_no_log()
     end subroutine
@@ -91,7 +91,7 @@ contains
     end subroutine
 
     !> Uses dt to increment time, returns 1 if time is successfully incremented
-    integer(C_INT) function it_time_increment() BIND(C,name='it_incrementtime')
+    integer(C_INT) function it_time_increment() BIND(C, name='it_incrementtime')
         use PrecisionMod, only: C_INT
         use TimeTools
         it_time_increment=0;
@@ -99,22 +99,22 @@ contains
     end function
 
     !!! Mutator Functions
-    subroutine it_setTmax(t_max_in) BIND(C,name='it_setTmax')
+    subroutine it_setTmax(t_max_in) BIND(C, name='it_setTmax')
         use PrecisionMod, only: MK, C_DOUBLE
         use TimeTools
         use HerbiVorData
-        real(C_DOUBLE),intent(in) :: t_max_in;
+        real(C_DOUBLE), intent(in) :: t_max_in
         call setTmax(real(t_max_in,MK))
         call settmax_herbivor(real(t_max_in,MK))
     end subroutine
 
-    real(C_DOUBLE) function it_Time%dt() BIND(C,name='it_getdt')
+    real(C_DOUBLE) function it_Time%dt() BIND(C, name='it_getdt')
         use PrecisionMod, only: C_DOUBLE
         use TimeTools
         it_getdt=real(Time%dt, C_DOUBLE);
     end function
 
-    integer(C_INT) function it_Time%ntmax() BIND(C,name='it_getntmax')
+    integer(C_INT) function it_Time%ntmax() BIND(C, name='it_getntmax')
         use PrecisionMod, only: C_INT
         use TimeTools
         it_getntmax=int(Time%ntmax,C_INT);
@@ -130,11 +130,9 @@ contains
         n=-1
         if(idb==0) then
             if(profile_database_polar_exists(ProfileDBInput,iprof,ipol)) n=ProfileDBInput%Profiles(iprof)%Polars(ipol)%nValues
-        elseif(idb==1) then 
+        elseif(idb==1) then
             if(profile_database_polar_exists(ProfileDBInterp,iprof,ipol)) n=ProfileDBInterp%Profiles(iprof)%Polars(ipol)%nValues
         endif
         if(n==-1) call log_warning('Polar not found in database')
     end function
-
 end module InterfaceLink
-

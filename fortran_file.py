@@ -1051,6 +1051,8 @@ class FortranMethod(object):
         self.name=name
         self.raw_name=raw_name
         self.bind_name=''
+        self.return_type=''
+        self.attributes=[]
         #
         self.result_name=''
         self.type='method'
@@ -1064,8 +1066,6 @@ class FortranMethod(object):
         self.varlist_raw=[]
         self.varlist=[]
         self.corpus=[]
-        self.bRecursive=False
-        self.return_type=''
         # UseStatement
         self.UseStatements=FortranUseStatements([])
 
@@ -1124,6 +1124,7 @@ class FortranMethod(object):
                 break
         before_method = ' '.join(words[0:i]).strip()
         after_method  = ' '.join(words[i+1:]).strip()
+        #print('before_method',before_method)
         # Joining all, and replacing () with space and splitting
         # NOTE: some methods can have no parenthesis 
         after_method  = after_method.replace(' ','')
@@ -1156,10 +1157,15 @@ class FortranMethod(object):
         # --------------------------------------------------------------------------------
         # ---  Special care for functions
         # --------------------------------------------------------------------------------
+        attr=before_method.strip().split()
+        for a in attr:
+            if a.lower() in ['pure','elemental','recursive']:
+                self.attributes.append(a.lower())
+            elif self.return_type=='':
+                self.return_type=a
+            else:
+                raise Exception('The following keyword before method was not accounted for:',a)
             ### Detection of 
-        if self.type=='function':
-            self.return_type=before_method.strip() # More handling required if recursive, pure, elemental, etc..
-        
         # --------------------------------------------------------------------------------
         # ---  Analysing Use Statements, Argument, Variables and corpus
         # --------------------------------------------------------------------------------
@@ -1225,7 +1231,11 @@ class FortranMethod(object):
         # print(self.arglist)
 
     def setRecusive(self,bRecursive):
-        self.bRecursive=bRecursive
+        """ set a method as recursive """
+        if 'recursive' in self.attributes:
+            self.attributes.remove('recursive')
+        if bRecursive:
+            self.attributes.append('recursive')
 
     def remove_unused_var(self):
         self.varlist=[d for d in self.varlist if (any([(d['varname'] in x) for x in self.corpus]))]
@@ -1277,15 +1287,17 @@ class FortranMethod(object):
         """ Routine to string """
         s=''
         # --- method's signature
-        goodies_before=''
         goodies_after=''
-        if self.bRecursive:
-            goodies_before='recursive '
-        else:
-            if len('self.result_name')>0 and self.result_name!='':
-                   goodies_after+=' result(%s)'%self.result_name
-            if len('self.bind_name')>0 and self.bind_name!='':
-                   goodies_after+=' BIND(C, name=\'%s\')'%self.bind_name
+        goodies_before=''
+        if len(self.attributes)>0:
+            goodies_before+=' '.join(self.attributes)+' '
+        if len(self.return_type)>0:
+            goodies_before+=self.return_type+' '
+
+        if len('self.result_name')>0 and self.result_name!='':
+               goodies_after+=' result(%s)'%self.result_name
+        if len('self.bind_name')>0 and self.bind_name!='':
+               goodies_after+=' BIND(C, name=\'%s\')'%self.bind_name
 
         s+='%s%s%s %s(%s)%s\n'%(indent,goodies_before,self.type,self.name,self.arglist_str,goodies_after)
 

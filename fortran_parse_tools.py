@@ -212,6 +212,24 @@ def first_entity(s):
     return tr
 
 
+def split_entities(s):
+    splits=[]
+    while True:
+        split=first_entity(s)
+        if len(split)>0:
+            splits.append(split.strip())
+            sp=s.split(split)
+            if len(sp)<=1:
+                break
+            else:
+                s=sp[1].strip().strip(',')
+        else:
+            break
+
+    return splits
+
+
+
 
 if __name__ == "__main__":
     L="""

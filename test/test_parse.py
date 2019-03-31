@@ -54,30 +54,30 @@ end program binary2Vtk"""
 # --- Module 
 # --------------------------------------------------------------------------------{
     def test_module(self):
-#         s="""module InterfaceLink
-#     use CStrings, only: cstring2fortran
-#     implicit none
-# contains
-#     subroutine io_term() BIND(C, name='io_term')
-#         use HerbiVor
-#         call herbivor_term();
-#     end subroutine
-# end module InterfaceLink"""
-#         F    = FortranFile(lines = s)
-#         sout = F.tostring(verbose = False)
-#         self.assert_string(sout,s)
-# 
-#         s="""module ProfileTypes
-#     use MathConstants, only: NaN
-#     implicit none
-#     type T_ProfilePolar
-#         integer :: nValues !< length of all polar vectors
-#         real(MK) :: Re !< Reynolds number
-#     end type
-# end module ProfileTypes"""
-#         F    = FortranFile(lines = s)
-#         sout = F.tostring(verbose = False)
-#         self.assert_string(sout,s)
+        s="""module InterfaceLink
+    use CStrings, only: cstring2fortran
+    implicit none
+contains
+    subroutine io_term() BIND(C, name='io_term')
+        use HerbiVor
+        call herbivor_term();
+    end subroutine
+end module InterfaceLink"""
+        F    = FortranFile(lines = s)
+        sout = F.tostring(verbose = False)
+        self.assert_string(sout,s)
+
+        s="""module ProfileTypes
+    use MathConstants, only: NaN
+    implicit none
+    type T_ProfilePolar
+        integer :: nValues !< length of all polar vectors
+        real(MK) :: Re !< Reynolds number
+    end type
+end module ProfileTypes"""
+        F    = FortranFile(lines = s)
+        sout = F.tostring(verbose = False)
+        self.assert_string(sout,s)
         s="""module ProfileTypes
     use MathConstants, only: NaN
     implicit none
@@ -93,23 +93,24 @@ end module ProfileTypes"""
 
 
     def test_function(self):
-        # TODO Types before function
         # TODO result
-
-#         s="""real(C_DOUBLE) function it_Time_dt() BIND(C,name='it_getdt')
-#     use PrecisionMod, only: C_DOUBLE
-#     use TimeTools
-#     it_getdt=real(Time%dt, C_DOUBLE);
-# end function"""
-        s="""function it_Time_dt() BIND(C, name='it_getdt')
+        s="""pure elemental real(C_DOUBLE) function it_Time_dt() result(aa) BIND(C, name='it_getdt')
     use PrecisionMod, only: C_DOUBLE
     use TimeTools
-    it_getdt=real(Time%dt, C_DOUBLE);
+    aa=real(Time%dt, C_DOUBLE);
 end function"""
         F    = FortranFile(lines   = s)
         sout = F.tostring(verbose = False)
         self.assert_string(s,sout)
-# 
+#         s="""function it_Time_dt() BIND(C, name='it_getdt')
+#     use PrecisionMod, only: C_DOUBLE
+#     use TimeTools
+#     it_getdt=real(Time%dt, C_DOUBLE);
+# end function"""
+#         F    = FortranFile(lines   = s)
+#         sout = F.tostring(verbose = False)
+#         self.assert_string(s,sout)
+
     def test_subroutine(self):
         # --- FortranFile - Subroutine outside of module:
         s="""subroutine io_term(x) BIND(C, name='io_term')
@@ -171,10 +172,8 @@ end subroutine"""
         self.assert_string(FortranDeclaration(s).tostring().strip(),s)
         s='real(MK), pointer :: x => null()'
         self.assert_string(FortranDeclaration(s).tostring().strip(),s)
-        # TODO
         s='complex(kind=MK), dimension(8) :: data = (/1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0/)'
         self.assert_string(FortranDeclaration(s).tostring().strip(),s)
-
 
         # Test advanced
         s='character(kind=C_CHAR,len=1), dimension(*), intent(in) :: x'
@@ -262,6 +261,24 @@ end type"""
         s     = 'dimension(n(1),n(2)), pointer'
         s_ref = 'dimension(n(1),n(2))'
         self.assert_stringi(first_entity(s),s_ref)
+
+        # Split
+        s     = 'dimension(n(1),n(2)), pointer'
+        self.assertEqual(split_entities(s),['dimension(n(1),n(2))','pointer'])
+
+        s     = 'dimension(n(1),n(2)), pointer'
+
+        s='real(MK), dimension(:,:,:), target, optional, save, intent(inout)'
+        self.assertEqual(split_entities(s),['real(MK)','dimension(:,:,:)','target','optional','save','intent(inout)'])
+
+        s='x => null(), a,q(3,4), c(:,:),v(N(1),:)'
+        self.assertEqual(split_entities(s),['x => null()','a','q(3,4)','c(:,:)','v(N(1),:)'])
+        s='data = (/1.0, 1.0/), n=1'
+        self.assertEqual(split_entities(s),['data = (/1.0, 1.0/)','n=1'])
+
+        # Not really what we would want
+        s='pure int(CI) function( x, n(1) )'
+        self.assertEqual(split_entities(s),['pure int(CI)','function( x, n(1) )'])
 
 # --------------------------------------------------------------------------------}
 # --- Split comments
