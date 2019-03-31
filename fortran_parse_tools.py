@@ -168,7 +168,7 @@ def split_comment(line):
                     break
                 i=i+1
             if bOK:
-                comment=l[(pos[i]):]
+                comment=l[(pos[i]):].strip()
                 l=l[:(pos[i])]
     return l,comment
 

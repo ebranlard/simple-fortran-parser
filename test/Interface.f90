@@ -1,13 +1,12 @@
 !> 
 module InterfaceLink
     use PrecisionMod, only: C_DOUBLE, C_INT, C_CHAR, MK
-    use HerbiVorIO,    only: log_error, log_info, log_warning
+    use HerbiVorIO, only: log_error, log_info, log_warning
     use CStrings, only: cstring2fortran
     implicit none
 
 contains
-
-    subroutine io_term() BIND(C,name='io_term')
+    subroutine io_term() BIND(C, name='io_term')
         use HerbiVor
         call herbivor_term();
     end subroutine
@@ -44,11 +43,11 @@ contains
     !> Setting a number variable
     subroutine io_set_var(svar_c,rval) BIND(C, name='io_set_var')
         use CStrings, only: cstring2fortran
-        use HerbiVorIO, only: log_error,log_info
+        use HerbiVorIO, only: log_error, log_info
         use HerbiVorIO, only: bdebug_set_triggers
-        use PrecisionMod,only:MK, C_DOUBLE, C_CHAR
-        use MatlabFunctions,only: num2str
-        use TimeTools,only: setdt,settmax
+        use PrecisionMod, only: MK, C_DOUBLE, C_CHAR
+        use MatlabFunctions, only: num2str
+        use TimeTools, only: setdt, settmax
         use HerbiVorData ! The variables we will change are in this module
         use WindData, only: TurbPart
         use TimeInfoTools, only: set_action_time_var
