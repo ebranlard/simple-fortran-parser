@@ -39,6 +39,7 @@ class Test(unittest.TestCase):
     implicit none
     real :: x
     integer :: i = 0
+    ! An addition is going to happen
     x=x+i
 contains
     subroutine f()
@@ -77,9 +78,18 @@ end module ProfileTypes"""
         F    = FortranFile(lines = s)
         sout = F.tostring(verbose = False)
         self.assert_string(sout,s)
-
-
-
+#         s=""" module ProfileTypes
+#     use MathConstants, only: NaN
+#     implicit none
+#     type T_ProfilePolar
+#         integer :: nValues !< length of all polar vectors
+#         real(MK) :: Re !< Reynolds number
+#         real(PROFILE_POLAR_KIND), dimension(:), pointer :: alpha => null() !< Angle of attack in degrees from -XX to XX
+#     end type
+# end module"""
+#         F    = FortranFile(lines = s)
+#         sout = F.tostring(verbose = False)
+#         self.assert_string(sout,s)
 
 
     def test_function(self):
@@ -159,8 +169,12 @@ end subroutine"""
         # Test init
         s='real(MK) :: x = 12'
         self.assert_string(FortranDeclaration(s).tostring().strip(),s)
-        s='real(MK), pointer :: x =>null()'
+        s='real(MK), pointer :: x => null()'
         self.assert_string(FortranDeclaration(s).tostring().strip(),s)
+        # TODO
+        s='complex(kind=MK), dimension(8) :: data = (/1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0/)'
+        self.assert_string(FortranDeclaration(s).tostring().strip(),s)
+
 
         # Test advanced
         s='character(kind=C_CHAR,len=1), dimension(*), intent(in) :: x'
@@ -200,7 +214,7 @@ end subroutine"""
     integer :: nValues !< length of all polar vectors
     real(MK) :: Re !< Reynolds number
 end type"""
-#         self.assert_string(FortranType(s).tostring().strip(),s)
+        self.assert_string(FortranType(s).tostring().strip(),s)
         s="""Type TgetWindSpeedData
     real*8   ::    u_mean, &                          ! 10 min mean wind speed
         tint, &                            ! turbulence intensity
@@ -213,7 +227,13 @@ end type"""
 end type"""
         self.assert_string(FortranType(s).tostring().strip(),s_ref)
 
-
+        s="""type T_ProfileGeometry
+    logical :: bFlatBack = .false. !< Is it a Flat back airfoil
+    ! input data
+    integer :: n_in = -1 !< dimension of x_in and y_in below
+    real(MK), dimension(:), pointer :: x_in => null()
+end type"""
+        self.assert_string(FortranType(s).tostring().strip(),s)
 
 
 # --------------------------------------------------------------------------------}
@@ -243,6 +263,9 @@ end type"""
         s_ref = 'dimension(n(1),n(2))'
         self.assert_stringi(first_entity(s),s_ref)
 
+# --------------------------------------------------------------------------------}
+# --- Split comments
+# --------------------------------------------------------------------------------{
 
 
 if __name__ == '__main__':

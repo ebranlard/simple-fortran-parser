@@ -29,18 +29,18 @@ def bind_lines_with_comments(lines):
         #print('>>'+l+'<>'+comment+'<')
         l=l.strip()
         # If it's a comment, we cancel all
-        if len(l)>0:
-            if l[0]=='!':
-                if bCat:
-                    eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
-                    eprint('Previous line: ',line_cat)
-                    eprint('Current line: ',l)
-                    parsed_lines.append(line_cat)
-                    parsed_lines.append(l)
-                else:
-                    parsed_lines.append(l)
-                bCat=False
-                continue
+        if len(l)==0:
+            if bCat:
+                eprint('Warning: Problematic line the previous line wants to concatenate with the current one')
+                eprint('Previous line: ',line_cat)
+                eprint('Current line: ',l)
+                parsed_lines.append(line_cat)
+                parsed_lines.append(l)
+            else:
+                parsed_lines.append('')
+                comments.append(line.strip())
+            bCat=False
+            continue
         if bCat:
             # let's see if it's a fortran multiple line string
             ll=l
@@ -149,7 +149,7 @@ def bind_lines(lines):
 # The case of comment after multiple line string is not supported
 
 def split_comment(line):
-    line=line.strip()
+    #line=line.strip()
     pos=find_pos(line,'!')
     comment=''
     l=line

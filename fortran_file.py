@@ -90,10 +90,9 @@ class FortranFile:
     def parse(self,Lines):
         if type(Lines) is not list:
             Lines=Lines.split('\n')
-#         L = bind_lines(Lines);
-#         (L,comments) = remove_comments(L);
         (L,comments) = bind_lines_with_comments(Lines)
-        #print('\n'.join(L))
+        #for l,c in zip(L,comments):
+        #    print(l+c)
         # --------------------------------------------------------------------------------
         # --- Extracting Modules, types and Use Statements,
         #  really nasty I should have extracted modules only and then pass it around...
@@ -105,6 +104,7 @@ class FortranFile:
         bIsInMethod     = False
         bIsInStandalone = False
         bIsInModule     = False
+        bIsContain      = False
         m  = None
         s  = None
         ss = None
@@ -177,13 +177,19 @@ class FortranFile:
             elif words[0].lower()=='endtype':
                 m.TypeList.append(t)
                 bIsInType=False
+            elif words[0].lower()=='contains':
+                bIsContain=True
             else:
                 if bIsInType:
                     t.append(l,c)
                 elif bIsInMethod:
                     s.append_raw(l,c)
                 elif bIsInModule:
-                    m.append_raw(l,c)
+                    if bIsContain:
+                        # Comments inside the contain region are discarded for now
+                        pass
+                    else:
+                        m.append_raw(l,c)
                 else:
                     print('Discarded line:',l)
 
@@ -417,11 +423,13 @@ class FortranModule:
         ## Declarations
         for i,d in enumerate(self.Declarations):
             s+=d.tostring(INDENT)+'\n'
+#         if len(self.Declarations)>0:
         ## Corpus
         for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
             s+=INDENT+c
-            if len(cm)>0:
-                s+=' '+cm
+            if len(cm)>0 and len(c)>0:
+                s+=' '
+            s+=cm
             s+='\n'
 
         ## Subroutines 
@@ -652,15 +660,11 @@ class FortranType:
         if raw_lines is not None:
             if type(raw_lines) is not list:
                 raw_lines=raw_lines.split('\n')
-#             lines = bind_lines(raw_lines);
             self.raw_lines=raw_lines
-#             (lines,comments) = remove_comments(lines);
             (lines,comments)=  bind_lines_with_comments(raw_lines);
             #for l,c in zip(lines,comments):
             #    print(l, '    ',c)
 
-
-#             lines = bind_lines(lines);
             if len(lines)<=0:
                 return
             # extracting name
@@ -1076,8 +1080,12 @@ class FortranMethod(object):
         self.raw_comment_lines.append(comment)
 #         self.Declarations.append(FortranDeclaration(line,comment))
 
-    def append_corpus(self,corpus):
-        self.corpus.append(corpus)
+    def append_corpus(self,corpus,comment=''):
+        s=corpus
+        if len(comment)>0 and len(corpus)>0:
+            s+=' '
+        s+=comment
+        self.corpus.append(s)
 
     def append_var(self,decl,comment=''):
         if not isinstance(decl,FortranDeclaration):
@@ -1175,7 +1183,7 @@ class FortranMethod(object):
                 self.UseStatements.append(FortranUseStatement(l,comment))
                 #print(l)
             else:
-                self.append_corpus(l)
+                self.append_corpus(l,comment) # TODO append line not l
 #             if pattern_intent_in.match(l):
 #             pass
         # --------------------------------------------------------------------------------
@@ -1294,6 +1302,8 @@ class FortranMethod(object):
             for d in self.varlist:
                 s+=d.tostring(indent+INDENT)+'\n'
 
+        # Corpus
+        # NOTE: corpus contains comments already
         if len(self.corpus)>0:
             if verbose:
                 s+='%s! Corpus\n'%(indent+INDENT)
@@ -1367,52 +1377,56 @@ class FortranDeclarations(list):
     def _parse(self,lines,comments):
         """ parse lines of declaration """
         for l,comment in zip(lines,comments):
-            bDeclaration=FortranDeclarations.isDeclaration(l)
-            if not bDeclaration:
-                raise Exception('Only declarations with `::` supported')
-            # --- handling several varaibles declared on one line
-            i_dots=l.find('::');
-            l_before=l[0:i_dots].strip()
-            l_after =l[i_dots+2:].strip()
-            splits=l_after.split(',') 
-            variables=[]
-            tmp=''
-            # handling declarations of the type :: a(1,2), b, M(:,:)
-            bInPar=False
-            for s in splits:
-                no=s.count('(')
-                nc=s.count(')')
-                if no==nc+1:
-                    tmp+=s+','
-                    bInPar=True
-                elif nc==no+1:
-                    variables.append(tmp+s)
-                    tmp=''
-                    bInPar=False
-                else:
-                    if bInPar:
+            if len(l.strip())==0:
+                # it's a pure comment
+                self.append(FortranDeclaration('',comment))
+            else:
+                bDeclaration=FortranDeclarations.isDeclaration(l)
+                if not bDeclaration:
+                    raise Exception('Only declarations with `::` supported')
+                # --- handling several varaibles declared on one line
+                i_dots=l.find('::');
+                l_before=l[0:i_dots].strip()
+                l_after =l[i_dots+2:].strip()
+                splits=l_after.split(',') 
+                variables=[]
+                tmp=''
+                # handling declarations of the type :: a(1,2), b, M(:,:)
+                bInPar=False
+                for s in splits:
+                    no=s.count('(')
+                    nc=s.count(')')
+                    if no==nc+1:
                         tmp+=s+','
+                        bInPar=True
+                    elif nc==no+1:
+                        variables.append(tmp+s)
+                        tmp=''
+                        bInPar=False
                     else:
-                        variables.append(s)
-            #if len(splits)>0:
-            #    print('Splits   : ',splits)
-            #    print('Variables: ',variables)
-            for var in variables:
-                l_new=''
-                # Old fashion declaration `a(5)`, to new fashion: `dimension(5) :: a` :
-                io=var.find('(')
-                ic=var.rfind(')')
-                #print('var',var,io,ic)
-                if io>0 and ic>0:
-                    dim=var[io+1:ic]
-                    if len(dim.strip())>0: # it could be x => null()
-                        var=var[:io]
-                        l_new = ', dimension('+dim+') '
-                        #print(l_before+':: '+var)
-                l_tmp=l_before+l_new+'::'+var.strip()
-                #print(l_tmp)
-                self.append(FortranDeclaration(l_tmp,comment))
-                comment='' # only the first declaration gets the comment
+                        if bInPar:
+                            tmp+=s+','
+                        else:
+                            variables.append(s)
+                #if len(splits)>0:
+                #    print('Splits   : ',splits)
+                #    print('Variables: ',variables)
+                for var in variables:
+                    l_new=''
+                    # Old fashion declaration `a(5)`, to new fashion: `dimension(5) :: a` :
+                    io=var.find('(')
+                    ic=var.rfind(')')
+                    #print('var',var,io,ic)
+                    if io>0 and ic>0:
+                        dim=var[io+1:ic]
+                        if len(dim.strip())>0: # it could be x => null()
+                            var=var[:io]
+                            l_new = ', dimension('+dim+') '
+                            #print(l_before+':: '+var)
+                    l_tmp=l_before+l_new+'::'+var.strip()
+                    #print(l_tmp)
+                    self.append(FortranDeclaration(l_tmp,comment))
+                    comment='' # only the first declaration gets the comment
 
     def tostring(self, indent=''):
         """ Declaration list to string """
@@ -1442,6 +1456,7 @@ class FortranDeclaration(dict):
                 pointer=False,\
                 save=False,\
                 optional=False,\
+                target=False,\
                 allocatable=False,\
                 intent='',\
                 varname='',\
@@ -1454,6 +1469,10 @@ class FortranDeclaration(dict):
 
         # Small safety
         l=l.replace(';','');
+        if len(l.strip())==0:
+            # it's likely a pure comment, we just keep our default init values
+            self['comment']=comment
+            return
         # --------------------------------------------------------------------------------
         # --- Converting declaration line to a dictionary
         # --------------------------------------------------------------------------------
@@ -1557,16 +1576,20 @@ class FortranDeclaration(dict):
             attributes+=', intent(%s)'%self['intent']
         if self['allocatable']:
             attributes+=', allocatable'
-        attributes+=' :: '+self['varname']
+        if len(attributes)>0:
+            attributes+=' :: '+self['varname']
         if len(self['varvalue'])>0:
             if self['pointer']:
-                attributes+=' =>'
+                attributes+=' => '
             else:
                 attributes+=' = '
-            attributes+=self['varvalue']
+            attributes+=self['varvalue'].strip()
 
         if len(self['comment'])>0:
-            attributes+=' '+self['comment']
+            if len(attributes)>0:
+                attributes+=' '
+        attributes+=self['comment']
+
         s+=indent+attributes
         return s
 

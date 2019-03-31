@@ -6,33 +6,33 @@ module ProfileTypes
     implicit none
     
     type T_ProfilePolar
-        integer                       :: nValues !< length of all polar vectors
+        integer :: nValues !< length of all polar vectors
         real(MK) :: Re !< Reynolds number
-        real(PROFILE_POLAR_KIND),dimension(:),pointer :: alpha =>null()  !< Angle of attack in degrees from -XX to XX
-        real(PROFILE_POLAR_KIND),dimension(:),pointer :: CL    =>null()  !< Lift coefficients
-        real(PROFILE_POLAR_KIND),dimension(:),pointer :: CD    =>null()  !< Drag coefficients
-        real(PROFILE_POLAR_KIND),dimension(:),pointer :: CM    =>null()  !< Moment coefficients
+        real(PROFILE_POLAR_KIND), dimension(:), pointer :: alpha => null() !< Angle of attack in degrees from -XX to XX
+        real(PROFILE_POLAR_KIND), dimension(:), pointer :: CL    => null() !< Lift coefficients
+        real(PROFILE_POLAR_KIND), dimension(:), pointer :: CD    => null() !< Drag coefficients
+        real(PROFILE_POLAR_KIND), dimension(:), pointer :: CM    => null() !< Moment coefficients
     end type
 
     type T_ProfileGeometry
-        logical :: bFlatBack=.false. !< Is it a Flat back airfoil
+        logical :: bFlatBack = .false. !< Is it a Flat back airfoil
         ! input data
-        integer ::n_in=-1 !< dimension of x_in and y_in below 
-        real(MK),dimension(:),pointer :: x_in=>null() 
-        real(MK),dimension(:),pointer :: y_in=>null() 
+        integer :: n_in = -1 !< dimension of x_in and y_in below 
+        real(MK), dimension(:), pointer :: x_in => null()
+        real(MK), dimension(:), pointer :: y_in => null()
         ! normalized data, have to include the LE and TE points
-        integer ::n_c=-1 !< dimension of x and y below 
-        real(MK),dimension(:),pointer :: x_c=>null() !< x/c geometry coordinates, LE is x=, TE is x=
-        real(MK),dimension(:),pointer :: y_c=>null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
+        integer :: n_c = -1 !< dimension of x and y below 
+        real(MK), dimension(:), pointer :: x_c => null() !< x/c geometry coordinates, LE is x=, TE is x=
+        real(MK), dimension(:), pointer :: y_c => null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
         ! Data in Body coordinate, scaled with chord, twisted. etc.
-        integer ::n=-1 !< dimension of x_in and y_in below 
-        real(MK),dimension(:),pointer :: x=>null() !< x/c geometry coordinates, LE is x=, TE is x=
-        real(MK),dimension(:),pointer :: y=>null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
+        integer :: n = -1 !< dimension of x_in and y_in below 
+        real(MK), dimension(:), pointer :: x => null() !< x/c geometry coordinates, LE is x=, TE is x=
+        real(MK), dimension(:), pointer :: y => null() !< y/c geometry coordinates, Upper side(Suction) is mainly y>0
         !
         real(MK) :: iLE !< index of LE point in x,y vectors
         real(MK) :: iTE !< index of TE point in x,y vectors
         ! "Linear theory variables"
-        integer ::nMean_c=-1 !< dimension of x_mean_c and y_mean_c below
+        integer ::nMean_c= -1 !< dimension of x_mean_c and y_mean_c below
         real(MK),dimension(:),pointer :: x_mean_c=>null() !< x Coordinate mean chord line, going from LE to TE
         real(MK),dimension(:),pointer :: y_mean_c=>null() !< 
         real(MK),dimension(:),pointer :: thickness_mean_c =>null()!< 
