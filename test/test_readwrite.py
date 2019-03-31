@@ -16,21 +16,21 @@ def loc(path):
 
 class Test(unittest.TestCase):
     def test_read(self):
-        pass
-        #F=FortranFile(loc('_TODO/MathUtils.f90'))
-        #F.write('_TODO/MathUtils_gen.f90')
-        #F=FortranFile(loc('_TODO/MatlabFunctions.f90'))
-        #F.write('_TODO/MatlabFunctions_gen.f90')
-        #F=FortranFile(loc('_TODO/ProjLibVpm_m2p.f90'))
-        #F.write('_TODO/ProjLibVpm_m2p_gen.f90')
-        #F=FortranFile(loc('_TODO/ProjLibVpm_p2m.f90'))
-        #F.write('_TODO/ProjLibVpm_p2m_gen.f90')
-        #F=FortranFile(loc('_TODO/VectorAnalysisStrides.f90'))
-        #F.write('_TODO/VectorAnalysisStrides_gen.f90')
-        #F=FortranFile(loc('_TODO/Wind.f90'))
-        #F.write('_TODO/Wind.f90')
-        #F=FortranFile(loc('_TODO/fft.f90'))
-        #F.write('_TODO/fft_gen.f90')
+#         pass
+        F=FortranFile(loc('_TODO/MathUtils.f90'))
+        F.write('_TODO/MathUtils_gen.f90')
+        F=FortranFile(loc('_TODO/MatlabFunctions.f90'))
+        F.write('_TODO/MatlabFunctions_gen.f90')
+        F=FortranFile(loc('_TODO/ProjLibVpm_m2p.f90'))
+        F.write('_TODO/ProjLibVpm_m2p_gen.f90')
+        F=FortranFile(loc('_TODO/ProjLibVpm_p2m.f90'))
+        F.write('_TODO/ProjLibVpm_p2m_gen.f90')
+        F=FortranFile(loc('_TODO/VectorAnalysisStrides.f90'))
+        F.write('_TODO/VectorAnalysisStrides_gen.f90')
+        F=FortranFile(loc('_TODO/Wind.f90'))
+        F.write('_TODO/Wind.f90')
+        F=FortranFile(loc('_TODO/fft.f90'))
+        F.write('_TODO/fft_gen.f90')
 
 if __name__ == '__main__':
     unittest.main()

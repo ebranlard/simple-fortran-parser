@@ -26,8 +26,8 @@ def bind_lines_with_comments(lines):
         #print('>',line)
         (l_ori,comment)=split_comment(line)
         comment=comment.rstrip()
-        #print('>>'+l+'<>'+comment+'<')
         l_ori = l_ori.rstrip()
+        #print('>>'+l_ori+'<>'+comment+'<')
         l     = l_ori.strip()
         # If it's a comment, we cancel all
         if len(l)==0:

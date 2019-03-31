@@ -74,6 +74,9 @@ end module InterfaceLink"""
         integer :: nValues !< length of all polar vectors
         real(MK) :: Re !< Reynolds number
     end type
+    public :: tata
+    type(T_ProfilePolar), save :: prof
+    private
 end module ProfileTypes"""
         F    = FortranFile(lines = s)
         sout = F.tostring(verbose = False)
@@ -125,13 +128,10 @@ end subroutine"""
         self.assert_string(s,sout)
 
         # --- FortranMethod - Subroutine directly parsed
-        #print('------------------------')
         M    = FortranMethod(raw_lines = s)
         sout = M.tostring(indent= '', verbose=False)
         self.assert_string(s,sout)
-
-        #     import pdb
-        #     pdb.set_trace()
+        #
         s="""subroutine profile_list_tostring(ProfileList,iunit_opt)
     type(T_RefProfile), pointer :: ProfileList
     integer, optional, intent(in) :: iunit_opt
@@ -143,7 +143,23 @@ end subroutine"""
         M    = FortranMethod(raw_lines = s)
         sout = M.tostring(indent= '', verbose=False)
         self.assert_string(s,sout)
-        #print(M.tostring())
+        #
+        # --- FortranMethod - Subroutine with ^
+        s="""subroutine profile_list_tostring(ProfileList &
+            ,iunit_opt &
+            )
+    real, intent(in) :: ProfileList
+    integer, intent(inout) :: iunit_opt
+    iunit_opt=iunit_opt+ProfileList
+end subroutine"""
+        s_ref="""subroutine profile_list_tostring(ProfileList,iunit_opt)
+    real, intent(in) :: ProfileList
+    integer, intent(inout) :: iunit_opt
+    iunit_opt=iunit_opt+ProfileList
+end subroutine"""
+        M    = FortranMethod(raw_lines = s)
+        sout = M.tostring(indent= '', verbose=False)
+        self.assert_string(sout,s_ref)
 
 
 
@@ -311,6 +327,29 @@ end type"""
         self.assertEqual(reindent(s,'    '),'    aa')
         s='        aa'
         self.assertEqual(reindent(s,'    '),'        aa')
+
+
+# --------------------------------------------------------------------------------}
+# --- Bind lines 
+# --------------------------------------------------------------------------------{
+    def test_bind(self):
+        s="""a ! b"""
+        (L,C)=bind_lines_with_comments(s.split('\n'))
+        self.assertEqual(L[0],'a')
+        self.assertEqual(C[0],'! b')
+        s="""aa &   ! my com
+bb  """
+        (L,C)=bind_lines_with_comments(s.split('\n'))
+        self.assertEqual(L[0],'aa bb')
+        self.assertEqual(C[0],'! my com')
+
+        # TODO string continuation
+        s="""s="aa"&   ! my com
+&"bb"  """
+        (L,C)=bind_lines_with_comments(s.split('\n'))
+        self.assertEqual(L[0],'s="aa""bb"')
+        self.assertEqual(C[0],'! my com')
+
 
 if __name__ == '__main__':
     unittest.main()
