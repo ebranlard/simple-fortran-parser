@@ -32,7 +32,7 @@ contains
     !> Getting a string variable
     subroutine io_set_output_to_std(flag_c) BIND(C, name='io_set_output_to_std')
         use HerbiVorIO, only: set_output_to_std
-        use PrecisionMod,only:C_INT
+        use PrecisionMod, only: C_INT
         !
         integer(C_INT),intent(in) :: flag_c   !< 1=output to std
         !

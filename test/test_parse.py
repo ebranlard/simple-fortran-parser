@@ -363,8 +363,9 @@ bb  """
     def test_debug(self):
         def loc(path):
             return os.path.join(MyDir,path)
-        #F=FortranFile(loc('UglyTypes.f90'))
-        #print(F.tostring())
+        F=FortranFile(loc('Interface.f90'))
+        F.tostring()
+        #print('>>>>')
         pass
 
 

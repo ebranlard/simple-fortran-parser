@@ -77,6 +77,8 @@ class FortranFile:
         if self.filename is not None:
             if os.path.exists(self.filename):
                 self.read()
+            else:
+                raise Exception('Error: file not found `{}`'.format(self.filename))
         elif lines is not None:
             self.parse(lines)
         else:
@@ -125,6 +127,7 @@ class FortranFile:
                 l_clean='end'+l_clean[4:]
             words_ori = l_clean.split()
             words_low = l_clean.lower().split()
+            bRegularAppend=False
             if len(words_low)>0:
                 # Detecting modules / programs 
                 # For now programs are treated like modules, except they have a different type
@@ -154,7 +157,7 @@ class FortranFile:
                     #print('\n'.join(method_lines))
                     #print('-------------------------------------------')
                     if bIsInModule:
-                        m.MethodList.append(FortranMethod(raw_lines=method_lines))
+                        m.Elements.append(FortranMethod(raw_lines=method_lines))
                         bIsInMethod=False
                     elif bIsInStandalone:
                         self.Routines.append(FortranMethod(raw_lines=method_lines))
@@ -168,7 +171,10 @@ class FortranFile:
                         eprint('    line:  ',l)
                     else:
                         if not bIsInMethod :
-                            m.UseStatements.append(FortranUseStatement(l,c))
+                            if bIsInModule:
+                                m.Elements.append(FortranUseStatement(l,c))
+                            else:
+                                raise Exception('Use statement found outside of module and subroutine, line `{}` '.format(l))
                         else:
                             method_lines.append(l+c)
 
@@ -188,37 +194,29 @@ class FortranFile:
                         method_lines.append(l+c)
                 elif words_low[0]=='endtype':
                     type_lines.append(l+c)
-                    m.TypeList.append(FortranType(type_lines))
+                    m.Elements.append(FortranType(type_lines))
                     bIsInType=False
                 elif words_low[0]=='contains':
-                    bIsContain=True
+                    #bIsContain=True
+                    pass
                 else:
-                    if bIsInType:
-                        type_lines.append(l+c)
-                    elif bIsInMethod:
-                        method_lines.append(l+c)
-                    elif bIsInModule:
-                        if bIsContain:
-                            # Comments inside the contain region are discarded for now
-                            pass
-                        else:
-                            m.append_raw(l,c)
-                    else:
-                        print('Discarded line:',l)
+                    # not a special keyword, we append to where we are (method, module, type)
+                    bRegularAppend=True
             else:
-                # Comment only line
+                # this is aline with comment only
+                bRegularAppend=True
+
+            # --- Appending resgular line to specific containers (type, method, module)
+            if bRegularAppend:
                 if bIsInType:
                     type_lines.append(l+c)
                 elif bIsInMethod:
                     method_lines.append(l+c)
                 elif bIsInModule:
-                    if bIsContain:
-                        # Comments inside the contain region are discarded for now
-                        pass
-                    else:
-                        m.append_raw(l,c)
+                    m.append_raw(l,c)
                 else:
-                    print('Discarded line:',l,c)
+                    pass
+                    #print('Discarded line:',l+c)
 
         if bIsInModule:
             raise Exception('No end of module found')
@@ -228,10 +226,6 @@ class FortranFile:
         # --------------------------------------------------------------------------------
         for m in self.Modules:
             m.analyse_raw_data()
-        #for s in self.Routines:
-        #    s.analyse_raw_data()
-#                     for l in t.raw_lines:
-#                         print(l)
 
     def tostring(self,verbose=True):
         """ File to string """
@@ -316,6 +310,25 @@ class FortranFile:
             f.close()
 
 
+# --------------------------------------------------------------------------------}
+# --- FortranLine
+# --------------------------------------------------------------------------------{
+class FortranLine:
+    def __init__(self,line,comment=''):
+        self.line    = line
+        self.comment = comment
+    def tostring(self,indent=''):
+        s=''
+        ss=self.line
+        if len(self.comment)>0 and len(self.line)>0:
+            ss+=' '
+        ss+=self.comment
+        s+=reindent(ss,indent)
+        #print('s:',s)
+        return s
+
+    def __repr__(self):
+        return tostring(self)
 
 # --------------------------------------------------------------------------------}
 # ---  Fortran Module
@@ -324,7 +337,9 @@ class FortranModule:
     def __init__(self,name):
         self.name=name
         self.type='module'
-        # UseStatement
+        # All data
+        self.Elements=[]
+        # 
         self.UseStatements=FortranUseStatements([])
         # Types
         self.TypeList=[]
@@ -333,58 +348,39 @@ class FortranModule:
         # Interfaces #TODO
         # Variables #TODO
         self.Declarations=[]
-        self.Corpus=[]
         # Methods
         self.MethodList=[]
         # Misc
 
-        self._declarations_raw         = []
-        self._declarations_comment_raw = []
-        self._corpus_raw               = []
-        self._corpus_comment_raw       = []
+#         self._declarations_raw         = []
+#         self._declarations_comment_raw = []
+#         self._corpus_raw               = []
+#         self._corpus_comment_raw       = []
 
     def append_raw(self,line,comment):
         if FortranDeclarations.isDeclaration(line):
-            self._declarations_raw.append(line)
-            self._declarations_comment_raw.append(comment)
+            self.Elements.append(FortranDeclarations(lines=[line],comments=[comment]))
+#             self._declarations_raw.append(line)
+#             self._declarations_comment_raw.append(comment)
         else:
-            self._corpus_raw.append(line)
-            self._corpus_comment_raw.append(comment)
+            self.Elements.append(FortranLine(line,comment))
+#             self._corpus_raw.append(line)
+#             self._corpus_comment_raw.append(comment)
 
 
     def analyse_raw_data(self):
         #print(self.type+' '+self.name)
-        # --------------------------------------------------------------------------------}
-        # --- Analysing self corpus and declarations
-        # --------------------------------------------------------------------------------{
-        self.Declarations = FortranDeclarations(lines=self._declarations_raw,comments=self._declarations_comment_raw)
-        # --------------------------------------------------------------------------------}
-        # --- Corpus 
-        # --------------------------------------------------------------------------------{
-        # Removng some keywords that are handled automatically  
-        IPop=[]
-        for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
-            l=c.lower().replace(' ','')
-            if l.find('contains')==0:
-                IPop.append(i)
-            elif l.find('implicitnone')==0:
-                IPop.append(i)
-            elif l.find('module')==0 or l.find('program')==0:
-                IPop.append(i)
-            elif l.find('endmodule')==0 or l.find('endprogram')==0:
-                IPop.append(i)
-        for i in sorted(IPop, reverse=True):
-            del self._corpus_raw[i]
-            del self._corpus_comment_raw[i]
-
-
         # --------------------------------------------------------------------------------
         # ---  Analysig sub elements
         # --------------------------------------------------------------------------------
+        self.TypeList=[t for t in self.Elements if type(t)==FortranType]
+        self.UseStatement=FortranUseStatements([u for u in self.Elements if type(u)==FortranUseStatement])
+
         # Analyse Types
         for t in self.TypeList:
+            self.TypeList=[]
             #print('TYPE: '+t.raw_name)
-            t.analyse_raw_data()
+            #t.analyse_raw_data()
             self.type_dependencies.append(t.dependencies)
 
         # --------------------------------------------------------------------------------
@@ -431,35 +427,27 @@ class FortranModule:
 
     def tostring(self):
         """ Module to string """
+
+        bInContains=False
+        LastType=None
+
+        # For now we keep control of the first, last and contain line
         s=''
         s+=self.type+ ' '+self.name+'\n'
-        # Use statements
-        s+=self.UseStatements.tostring(indent=INDENT)
-        s+=INDENT+'implicit none\n'
-        ## Types
-        for i,t in enumerate(self.TypeList):
-            s+=t.tostring(INDENT)
-            if i<len(self.TypeList)-1:
+        for e in self.Elements:
+            # Esthetics, adding spacing between subroutines and types
+            if LastType==FortranMethod or LastType==FortranType:
                 s+='\n'
-        ## Declarations
-        for i,d in enumerate(self.Declarations):
-            s+=d.tostring(INDENT)+'\n'
-#         if len(self.Declarations)>0:
-        ## Corpus
-        for i,(c,cm) in enumerate(zip(self._corpus_raw,self._corpus_comment_raw)):
-            ss=c
-            if len(cm)>0 and len(c)>0:
-                ss+=' '
-            ss+=cm
-            s+=reindent(ss,INDENT)+'\n'
 
-        ## Subroutines 
-        if len(self.MethodList)>0:
-            s+='contains\n'
-            for i,m in enumerate(self.MethodList):
-                s+=m.tostring(indent=INDENT)+'\n'
-                if i<len(self.MethodList)-1:
-                    s+='\n'
+            if isinstance(e,FortranMethod) and (not bInContains):
+                s+='contains'+'\n'
+                bInContains=True
+            if isinstance(e,FortranDeclarations) or isinstance(e,FortranType):
+                s+=e.tostring(INDENT)
+            else:
+                s+=e.tostring(INDENT)+'\n'
+
+            LastType=type(e)
         s+='end '+self.type+ ' '+self.name
         return s
 
