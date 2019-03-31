@@ -57,6 +57,24 @@ end module ProfileTypes"""
 
 
 
+    def test_function(self):
+        # TODO Types before function
+        # TODO result
+
+#         s="""real(C_DOUBLE) function it_Time_dt() BIND(C,name='it_getdt')
+#     use PrecisionMod, only: C_DOUBLE
+#     use TimeTools
+#     it_getdt=real(Time%dt, C_DOUBLE);
+# end function"""
+        s="""function it_Time_dt() BIND(C, name='it_getdt')
+    use PrecisionMod, only: C_DOUBLE
+    use TimeTools
+    it_getdt=real(Time%dt, C_DOUBLE);
+end function"""
+        F    = FortranFile(lines   = s)
+        sout = F.tostring(verbose = False)
+        self.assert_string(s,sout)
+# 
     def test_subroutine(self):
         # --- FortranFile - Subroutine outside of module:
         s="""subroutine io_term(x) BIND(C, name='io_term')
@@ -89,7 +107,8 @@ end subroutine"""
         M    = FortranMethod(raw_lines = s)
         sout = M.tostring(indent= '', verbose=False)
         self.assert_string(s,sout)
-#         print(M.tostring())
+        #print(M.tostring())
+
 
 
 

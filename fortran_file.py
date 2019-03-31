@@ -144,7 +144,7 @@ class FortranFile:
                     m.MethodList.append(s)
                     bIsInMethod=False
                 else:
-                    eprint('Error, subroutines not in modules not handled yet')
+                    self.Routines.append(s)
             elif words[0].lower()=='use':
                 if (not bIsInModule) and (not bIsInStandalone):
                     eprint('Error, use statements found outside of module or subroutine!')
@@ -1032,15 +1032,14 @@ class FortranMethod(object):
         # ---  Analysing raw_name
         # --------------------------------------------------------------------------------
         #print('RawName:',self.raw_name)
-        words=self.raw_name.lower().split(' ')
-        for (w,i) in zip(words,range(len(words))):
-            if w=='subroutine':
+        words=self.raw_name.split(' ')
+        for (i,w) in enumerate(words):
+            if w.lower()=='subroutine':
                 self.type='subroutine'
                 break
-            if w=='function':
+            if w.lower()=='function':
                 self.type='function'
                 break
-
         before_method = ' '.join(words[0:i]).strip()
         after_method  = ' '.join(words[i+1:]).strip()
         # Joining all, and replacing () with space and splitting
@@ -1055,7 +1054,6 @@ class FortranMethod(object):
         if len(words)>1:
             if len(words[1])>0:
                 self.arglist_name_raw=words[1].split(',')
-
         # --------------------------------------------------------------------------------
         # ---  Things after signature (i.e. bind and result) NASTY
         # --------------------------------------------------------------------------------
@@ -1064,18 +1062,15 @@ class FortranMethod(object):
         ### Trying to read bind and result
         bind_var=''
         for (w,i) in zip(words,range(len(words))):
-            if w=='result':
+            if w.lower()=='result':
                 self.result_name=words[i+1]
-            if w=='bind':
+            if w.lower()=='bind':
                 bind_var=words[i+1]
-
         # Extracting bind name from bind words
         if bind_var!='':
             # WATCH OUT THIS IS NOT GENERAL!!!! is assumes a form: BIND(C,name='bind_name')
             names=bind_var.split('\'')
             self.bind_name=names[1]
-            # Hmm... This below seems like a hack: overriding method name by bind name.. I guessed I used that for the signatures. Signatures should now use bind_name instead...
-            self.name=names[1]
         # --------------------------------------------------------------------------------
         # ---  Special care for functions
         # --------------------------------------------------------------------------------
