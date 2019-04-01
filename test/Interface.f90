@@ -4,13 +4,12 @@ module InterfaceLink
     use HerbiVorIO, only: log_error, log_info, log_warning
     use CStrings, only: cstring2fortran
     implicit none
-
 contains
     subroutine io_term() BIND(C, name='io_term')
         use HerbiVor
         call herbivor_term();
     end subroutine
-    
+
     !> Returns 1 if library has no error
     integer(C_INT) function check() BIND(C, name='check')
         use PrecisionMod, only: C_INT

@@ -68,7 +68,7 @@ INDENT='    '
 # --------------------------------------------------------------------------------
 # ---  FortranFile class
 # --------------------------------------------------------------------------------
-class FortranFile:
+class FortranFile(object):
     def __init__(self,filename=None,lines=None):
         self.filename=filename
         self.Modules=[]
@@ -313,7 +313,7 @@ class FortranFile:
 # --------------------------------------------------------------------------------}
 # --- FortranLine
 # --------------------------------------------------------------------------------{
-class FortranLine:
+class FortranLine(object):
     def __init__(self,line,comment=''):
         self.line    = line
         self.comment = comment
@@ -333,7 +333,7 @@ class FortranLine:
 # --------------------------------------------------------------------------------}
 # ---  Fortran Module
 # --------------------------------------------------------------------------------{
-class FortranModule:
+class FortranModule(object):
     def __init__(self,name):
         self.name=name
         self.type='module'
@@ -370,18 +370,23 @@ class FortranModule:
 
     def analyse_raw_data(self):
         #print(self.type+' '+self.name)
+        self.type_dependencies=[]
+        self.type_depend_mod=[]
         # --------------------------------------------------------------------------------
         # ---  Analysig sub elements
         # --------------------------------------------------------------------------------
         self.TypeList=[t for t in self.Elements if type(t)==FortranType]
-        self.UseStatement=FortranUseStatements([u for u in self.Elements if type(u)==FortranUseStatement])
+        self.UseStatements=FortranUseStatements([u for u in self.Elements if type(u)==FortranUseStatement])
 
         # Analyse Types
         for t in self.TypeList:
-            self.TypeList=[]
             #print('TYPE: '+t.raw_name)
             #t.analyse_raw_data()
             self.type_dependencies.append(t.dependencies)
+
+        #for u in self.UseStatements:
+            #print('USE : '+str(u))
+            #t.analyse_raw_data()
 
         # --------------------------------------------------------------------------------
         # --- Type Dependencies
@@ -436,7 +441,8 @@ class FortranModule:
         s+=self.type+ ' '+self.name+'\n'
         for e in self.Elements:
             # Esthetics, adding spacing between subroutines and types
-            if LastType==FortranMethod or LastType==FortranType:
+            if (LastType==FortranMethod or LastType==FortranType) and (LastType==type(e)):
+#                 print(LastType)
                 s+='\n'
 
             if isinstance(e,FortranMethod) and (not bInContains):
@@ -467,6 +473,13 @@ class FortranModule:
                 s.write_signature_def(f)
 
     def write_type_tools(self,f):
+        # A call to that may be needed to set 
+        #  - UseStatements
+        #  - TypeList
+        #  - type_depend_mod
+        #  - type_dependencies
+        #self.analyse_raw_data()
+
         f.write('module %s\n'%get_type_tool_module(self.name))
         f.write('    ! Module containing type: \n')
         f.write('    use %s\n'%(self.name))
@@ -482,11 +495,12 @@ class FortranModule:
         f.write('    implicit none\n\n')
         f.write('    private\n\n')
 
-
         # --------------------------------------------------------------------------------
         # ---  Interfaces and public attributes
         # --------------------------------------------------------------------------------
+        #print(self.TypeList)
         for t in self.TypeList:
+            #print('t:',t.pretty_name)
             if(t.pretty_name.lower().find('inputs')>0):
                 TOOLS_LOC=TOOLS+TOOLS_INPUT
             else:
@@ -509,9 +523,6 @@ class FortranModule:
                         f.write('    public :: %s_%s\n'%(t.pretty_name,routine_name))
 
             f.write('\n')
-
-
-
 
         f.write('contains\n')
 
@@ -651,7 +662,7 @@ class FortranUseStatement(dict):
 # --------------------------------------------------------------------------------}
 # --- Fortran Type 
 # --------------------------------------------------------------------------------{
-class FortranType:
+class FortranType(object):
     def __init__(self,raw_lines=None,name=None):
         # Raw data
         self.raw_lines=[]
@@ -682,7 +693,8 @@ class FortranType:
             if len(words)<1 or words[0].lower()!='type':
                 raise Exception('First line of type definition should start with `type`: ',lines[0])
             self.raw_name = words[1]
-            self.name     = self.pretty_type(words[1])
+            self.name     = words[1]
+            self.pretty_name=self.pretty_type(self.name)
             lastline=''.join(lines[-1].split())
             if lastline.find('end')<0:
                 raise Exception('Last line of type definition should start with `end`: ',lines[0])
@@ -772,8 +784,11 @@ class FortranType:
         if ('0' in routines) and not bSimpleInOut:
             FS=self._getRoutine0io('_init_0')
             for d in self.Declarations:
-                FS.append_corpus(d.get_init('X%'))
+                if len(d['varname'])>0:
+                    #print('d:',str(d))
+                    FS.append_corpus(d.get_init('X%'))
             FS.write_to_file(f)
+            f.write('\n\n')
 #         if ('inout' in routines) and bSimpleInOut:
 #             FS=self._getRoutine0io('_init_inout')
 #             FS.append_var('type(%s), pointer :: %s '%(self.raw_name,'pX'))
@@ -785,9 +800,11 @@ class FortranType:
             FS=self._getRoutine0p('_initp_0')
             FS.append_corpus('if (associated(X)) then')
             for d in self.Declarations:
-                FS.append_corpus(d.get_init('X%'))
+                if len(d['varname'])>0:
+                    FS.append_corpus(d.get_init('X%'))
             FS.append_corpus('endif')
             FS.write_to_file(f)
+            f.write('\n\n')
         if ('1' in routines):
             FS=self._getRoutine1p('_initp_1')
             FS.append_var('integer :: iX')
@@ -797,21 +814,26 @@ class FortranType:
             FS.append_corpus('    enddo')
             FS.append_corpus('endif')
             FS.write_to_file(f)
+            f.write('\n\n')
 
     # Tools that write the termination function of a derived type
     def write_tool_term(self,f,routines):
         FS=self._getRoutine0io('_term_0')
         for d in self.Declarations:
-            FS.append_corpus(d.get_term('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_term('X%'))
         FS.write_to_file(f)
+        f.write('\n\n')
     def write_tool_termp(self,f,routines):
         FS=self._getRoutine0p('_termp_0')
         FS.append_corpus('if (associated(X)) then')
         for d in self.Declarations:
-            FS.append_corpus(d.get_term('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_term('X%'))
         FS.append_corpus('    deallocate(X)')
         FS.append_corpus('endif')
         FS.write_to_file(f)
+        f.write('\n\n')
 
         if ('1' in routines):
             FS=self._getRoutine1p('_termp_1')
@@ -823,9 +845,8 @@ class FortranType:
             FS.append_corpus('    deallocate(X)')
             FS.append_corpus('endif')
             FS.write_to_file(f)
-
+            f.write('\n\n')
 #         FS.name=FS.name.replace('pointer','0')
-#         FS.write_to_file_inout(f)
 
 
 
@@ -833,18 +854,22 @@ class FortranType:
         FS=self._getRoutine0i('_write_0')
         FS.append_arg('integer, intent(in) :: iunit')
         for d in self.Declarations:
-            FS.append_corpus(d.get_write('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_write('X%'))
         FS.write_to_file(f)
+        f.write('\n\n')
 
     def write_tool_writep(self,f,routines):
         FS=self._getRoutine0p('_writep_0')
         FS.append_arg('integer, intent(in) :: iunit')
-        FS.append_corpus('write(iunit)associated(X)\n')
+        FS.append_corpus('write(iunit)associated(X)')
         FS.append_corpus('if (associated(X)) then')
         for d in self.Declarations:
-            FS.append_corpus(d.get_write('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_write('X%'))
         FS.append_corpus('endif')
         FS.write_to_file(f)
+        f.write('\n\n')
         if ('1' in routines):
             FS=self._getRoutine1p('_writep_1')
             FS.append_arg('integer, intent(in) :: iunit')
@@ -857,6 +882,7 @@ class FortranType:
             FS.append_corpus('    enddo')
             FS.append_corpus('endif')
             FS.write_to_file(f)
+            f.write('\n\n')
 
 
     def write_tool_read(self,f,routines):
@@ -869,8 +895,9 @@ class FortranType:
         # We need to we get the maximum number of dimensions of variables
         m=0
         for d in self.Declarations:
-            if d['pointer'] or d['allocatable']:
-                m=max((d['ndimensions'],m))
+            if len(d['varname'])>0:
+                if d['pointer'] or d['allocatable']:
+                    m=max((d['ndimensions'],m))
 
         if m>0 :
             FS.append_var('integer :: nd1')
@@ -883,8 +910,10 @@ class FortranType:
         # Reading type
 
         for d in self.Declarations:
-            FS.append_corpus(d.get_read('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_read('X%'))
         FS.write_to_file(f)
+        f.write('\n\n')
     
     def write_tool_readp(self,f,routines):
         # Writting routine name
@@ -896,8 +925,9 @@ class FortranType:
         # We need to we get the maximum number of dimensions of variables
         m=0
         for d in self.Declarations:
-            if d['pointer'] or d['allocatable']:
-                m=max((d['ndimensions'],m))
+            if len(d['varname'])>0:
+                if d['pointer'] or d['allocatable']:
+                    m=max((d['ndimensions'],m))
 
         if m>0 :
             FS.append_var('integer :: nd1')
@@ -911,9 +941,11 @@ class FortranType:
         FS.append_corpus('if (bPresent) then')
         FS.append_corpus('allocate(X)')
         for d in self.Declarations:
-            FS.append_corpus(d.get_read('X%'))
+            if len(d['varname'])>0:
+                FS.append_corpus(d.get_read('X%'))
         FS.append_corpus('endif')
         FS.write_to_file(f)
+        f.write('\n\n')
         if ('1' in routines):
             FS=self._getRoutine1p('_readp_1')
             FS.append_arg('integer, intent(in) :: iunit')
@@ -936,12 +968,14 @@ class FortranType:
             FS.append_corpus('    enddo')
             FS.append_corpus('endif')
             FS.write_to_file(f)
+            f.write('\n\n')
 
     def write_tool_set_var(self,f,routines):
         #
         MAX_VAR_LENGTH=0
         for d in self.Declarations:
-            MAX_VAR_LENGTH=max(len(d['varname']),MAX_VAR_LENGTH)
+            if len(d['varname'])>0:
+                MAX_VAR_LENGTH=max(len(d['varname']),MAX_VAR_LENGTH)
 
         if ('s' in routines):
             # Writting routine name
@@ -961,21 +995,22 @@ class FortranType:
             #select case(SubStrings%s(1))
             FS.append_corpus("select case (SubStrings%s(1))")
             for d in self.Declarations:
-                # Justifying variables
-                dqsp="'%s'"%d['varname']
-                dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
-                dsp =d['varname'].ljust(MAX_VAR_LENGTH)
-                #
-                #print("%s %s"%(dqsp, d['type']))
-                if d['type'].find('character')==0:
-                    FS.append_corpus("case(%s); X%%%s = trim(sval)"%(dqsp,dsp))
-                else:
-                    # For derived types, we only accept "inputs" types
-                    if (not d['built_in']):
-                        if d['type'].lower().find('inputs')>0:
-                            FS.append_corpus('case(%s)'%dqsp)
-                            FS.append_corpus("    if (SubStrings%n/=2) call log_error('Impossible to set '//trim(svar))")
-                            FS.append_corpus('    call %s_set_var(X%%%s,SubStrings%%s(2),svar)'%(d['pretty_type'],d['varname']))
+                if len(d['varname'])>0:
+                    # Justifying variables
+                    dqsp="'%s'"%d['varname']
+                    dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
+                    dsp =d['varname'].ljust(MAX_VAR_LENGTH)
+                    #
+                    #print("%s %s"%(dqsp, d['type']))
+                    if d['type'].find('character')==0:
+                        FS.append_corpus("case(%s); X%%%s = trim(sval)"%(dqsp,dsp))
+                    else:
+                        # For derived types, we only accept "inputs" types
+                        if (not d['built_in']):
+                            if d['type'].lower().find('inputs')>0:
+                                FS.append_corpus('case(%s)'%dqsp)
+                                FS.append_corpus("    if (SubStrings%n/=2) call log_error('Impossible to set '//trim(svar))")
+                                FS.append_corpus('    call %s_set_var(X%%%s,SubStrings%%s(2),svar)'%(d['pretty_type'],d['varname']))
 
             FS.append_corpus("case default")
             FS.append_corpus("    call log_error('Set %s Var: Invalid variable: '//trim(svar))"%self.pretty_name)
@@ -984,6 +1019,7 @@ class FortranType:
             FS.append_corpus("if(.false.)read(1)X ! just to avoid compiler warning if wariable not used")
 
             FS.write_to_file(f)
+            f.write('\n\n')
 #                 type='',\ dimension='',\ ndimensions=0,\ pointer=False,\ allocatable=False,\
 #                 intent='',\ varname='',\ varvalue='',\ comment='',\
 
@@ -1011,34 +1047,35 @@ class FortranType:
             #select case(SubStrings%s(1))
             FS.append_corpus("select case (SubStrings%s(1))")
             for d in self.Declarations:
-                dqsp="'%s'"%d['varname']
-                dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
-                dsp =d['varname'].ljust(MAX_VAR_LENGTH)
-                if d['pointer'] or d['allocatable']:
-                    eprint('Fortran File TODO',d)
-                else:
-                    if d['ndimensions']==0:
-                        select_in='1'
-                    elif d['ndimensions']==1:
-                        select_in='1:%s'%d['dimension']
+                if len(d['varname'])>0:
+                    dqsp="'%s'"%d['varname']
+                    dqsp=dqsp.ljust(MAX_VAR_LENGTH+2)
+                    dsp =d['varname'].ljust(MAX_VAR_LENGTH)
+                    if d['pointer'] or d['allocatable']:
+                        eprint('Fortran File TODO',d)
                     else:
-                        eprint('Fortran File TODO more than one dimension for inputs')
+                        if d['ndimensions']==0:
+                            select_in='1'
+                        elif d['ndimensions']==1:
+                            select_in='1:%s'%d['dimension']
+                        else:
+                            eprint('Fortran File TODO more than one dimension for inputs')
 
-                    if d['type']=='logical' :
-                        FS.append_corpus("case(%s); X%%%s = int(rvec(%s))==1"%(dqsp,dsp,select_in))
-                    elif d['type']=='integer':
-                        FS.append_corpus("case(%s); X%%%s = int(rvec(%s))"%(dqsp,dsp,select_in))
-                    elif d['type'][0:4]=='real':
-                        FS.append_corpus("case(%s); X%%%s =     rvec(%s) "%(dqsp,dsp,select_in))
-                    else:
-                        # For derived types, we only accept "inputs" types
-                        if (not d['built_in']):
-                            if d['type'].lower().find('inputs')>0:
-                                FS.append_corpus('case(%s)'%dqsp)
-                                FS.append_corpus("    if (SubStrings%n/=2) call log_error('Impossible to set '//trim(svar))")
-                                FS.append_corpus('    call %s_set_var(X%%%s,SubStrings%%s(2),rvec)'%(d['pretty_type'],d['varname']))
-                            else:
-                                eprint("Derived type skipped for inputs %s"%d['type'])
+                        if d['type']=='logical' :
+                            FS.append_corpus("case(%s); X%%%s = int(rvec(%s))==1"%(dqsp,dsp,select_in))
+                        elif d['type']=='integer':
+                            FS.append_corpus("case(%s); X%%%s = int(rvec(%s))"%(dqsp,dsp,select_in))
+                        elif d['type'][0:4]=='real':
+                            FS.append_corpus("case(%s); X%%%s =     rvec(%s) "%(dqsp,dsp,select_in))
+                        else:
+                            # For derived types, we only accept "inputs" types
+                            if (not d['built_in']):
+                                if d['type'].lower().find('inputs')>0:
+                                    FS.append_corpus('case(%s)'%dqsp)
+                                    FS.append_corpus("    if (SubStrings%n/=2) call log_error('Impossible to set '//trim(svar))")
+                                    FS.append_corpus('    call %s_set_var(X%%%s,SubStrings%%s(2),rvec)'%(d['pretty_type'],d['varname']))
+                                else:
+                                    eprint("Derived type skipped for inputs %s"%d['type'])
 
 
             FS.append_corpus("case default")
@@ -1047,6 +1084,7 @@ class FortranType:
             FS.append_corpus("call substr_term(SubStrings)")
             FS.append_corpus("if(.false.)read(1)X ! just to avoid compiler warning if wariable not used")
             FS.write_to_file(f)
+            f.write('\n\n')
 
 
 
@@ -1229,7 +1267,7 @@ class FortranMethod(object):
                 eprint('Arguments: ')
                 eprint(self.arglist)
                 eprint('Remaining declarations: ')
-                print(decl_stack)
+                eprint(decl_stack)
                 eprint('  ')
                 eprint('Error: argument `%s` not found in the declaration list of `%s` '%(arg_name,self.name))
                 eprint('       Did you use `intent` everywhere (except pointers)?')
@@ -1332,26 +1370,24 @@ class FortranMethod(object):
         # Corpus
         # NOTE: corpus contains comments already
         if len(self.corpus)>0:
+            # Compute min indent
+            nleading=999
+            for l in self.corpus:
+                nleading=min(nleading, len(l)-len(l.lstrip()))
+            #print('Common indent:',nleading)
+            self.corpus=[l[nleading:] for l in self.corpus]
+
             if verbose:
                 s+='%s! Corpus\n'%(indent+INDENT)
             for l in self.corpus:
                 if len(l)>0:
-                    for ll in l.split('\n'):
-                        s+=reindent(ll,indent+INDENT)+'\n'
+                    #for ll in l.split('\n'):
+                    s+=indent+INDENT+l+'\n'
         s+='%send %s'%(indent,self.type)
         return s
 
     def write_to_file(self,f,indent='    '):
-        f.write(self.tostring(indent))
-
-    # A kind of hack
-    def write_to_file_inout(self,f,indent='    '):
-        f.write('%s%s %s(%s)\n'%(indent,self.type,self.name,self.arglist_str))
-        for d in self.arglist:
-            d['pointer']=False
-            d.write_to_file(f,indent+INDENT)
-        f.write('%send %s %s\n\n'%(indent,self.type,self.name))
-
+        f.write(self.tostring(indent,verbose=True))
 
 class FortranSubroutine(FortranMethod):
     def __init__(self,name):
@@ -1408,6 +1444,7 @@ class FortranDeclarations(list):
     def _parse(self,lines,comments):
         """ parse lines of declaration """
         for l,comment in zip(lines,comments):
+            #print('l:'+l+'  c:'+comment)
             if len(l.strip())==0:
                 # it's a pure comment
                 self.append(FortranDeclaration('',comment))
@@ -1445,17 +1482,24 @@ class FortranDeclarations(list):
                 for var in variables:
                     l_new=''
                     # Old fashion declaration `a(5)`, to new fashion: `dimension(5) :: a` :
+                    ie=var.find('=')
                     io=var.find('(')
                     ic=var.rfind(')')
                     #print('var',var,io,ic)
-                    if io>0 and ic>0:
-                        dim=var[io+1:ic]
-                        if len(dim.strip())>0: # it could be x => null()
-                            var=var[:io]
-                            l_new = ', dimension('+dim+') '
-                            #print(l_before+':: '+var)
+                    if ie>0 and ie<io:
+                        # TODO may need more care
+                        # handling of C(3) = (/1.0, 2.0, 3.0/)
+                        # handling of C = (/1.0, 2.0, 3.0/)  
+                        pass
+                    else:
+                        if io>0 and ic>0:
+                            dim=var[io+1:ic]
+                            if len(dim.strip())>0: # it could be x => null()
+                                var=var[:io]
+                                l_new = ', dimension('+dim+') '
+                                #print(l_before+':: '+var)
                     l_tmp=l_before+l_new+'::'+var.strip()
-                    #print(l_tmp)
+                    #print('l_tmp:', l_tmp)
                     self.append(FortranDeclaration(l_tmp,comment))
                     comment='' # only the first declaration gets the comment
 
@@ -1607,7 +1651,7 @@ class FortranDeclaration(dict):
             attributes+=', intent(%s)'%self['intent']
         if self['allocatable']:
             attributes+=', allocatable'
-        if len(attributes)>0:
+        if len(attributes)>0 and len(self['varname'])>0:
             attributes+=' :: '+self['varname']
         if len(self['varvalue'])>0:
             if self['pointer']:
@@ -1657,6 +1701,7 @@ class FortranDeclaration(dict):
         init=''
         varname=preffix+self['varname']
         if self['built_in']:
+            #print(self.tostring(), '     ', self['varvalue'])
             if len(self['varvalue'])>0:
                 if self['pointer']:
                     init='%s => %s'%(varname,self['varvalue'])

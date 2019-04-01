@@ -198,6 +198,10 @@ end subroutine"""
         s='real*8, dimension(n(1),n(2)) :: x'
         self.assert_stringi(FortranDeclaration(s).tostring().strip(),s)
 
+
+        s='real(MK), dimension(3) :: P2_g = (/0.,0.,0./) !<'
+        self.assert_stringi(FortranDeclaration(s).tostring().strip(),s)
+
 # --------------------------------------------------------------------------------}
 # ---  
 # --------------------------------------------------------------------------------{
@@ -228,27 +232,28 @@ end subroutine"""
         s="""type T_ProfilePolar
     integer :: nValues !< length of all polar vectors
     real(MK) :: Re !< Reynolds number
+    real(MK), dimension(3) :: C = (/1.0, 2.0/) !<Misc
 end type"""
         self.assert_string(FortranType(s).tostring().strip(),s)
-        s="""Type TgetWindSpeedData
-    real*8   ::    u_mean, &                          ! 10 min mean wind speed
-        tint, &                            ! turbulence intensity
-        wind_yaw_ang
-        end type"""
-        s_ref="""type TgetWindSpeedData
-    real*8 :: u_mean ! 10 min mean wind speed turbulence intensity
-    real*8 :: tint
-    real*8 :: wind_yaw_ang
-end type"""
-        self.assert_string(FortranType(s).tostring().strip(),s_ref)
-
-        s="""type T_ProfileGeometry
-    logical :: bFlatBack = .false. !< Is it a Flat back airfoil
-    ! input data
-    integer :: n_in = -1 !< dimension of x_in and y_in below
-    real(MK), dimension(:), pointer :: x_in => null()
-end type"""
-        self.assert_string(FortranType(s).tostring().strip(),s)
+#         s="""Type TgetWindSpeedData
+#     real*8   ::    u_mean, &                          ! 10 min mean wind speed
+#         tint, &                            ! turbulence intensity
+#         wind_yaw_ang
+#         end type"""
+#         s_ref="""type TgetWindSpeedData
+#     real*8 :: u_mean ! 10 min mean wind speed turbulence intensity
+#     real*8 :: tint
+#     real*8 :: wind_yaw_ang
+# end type"""
+#         self.assert_string(FortranType(s).tostring().strip(),s_ref)
+# 
+#         s="""type T_ProfileGeometry
+#     logical :: bFlatBack = .false. !< Is it a Flat back airfoil
+#     ! input data
+#     integer :: n_in = -1 !< dimension of x_in and y_in below
+#     real(MK), dimension(:), pointer :: x_in => null()
+# end type"""
+#         self.assert_string(FortranType(s).tostring().strip(),s)
 
 
 # --------------------------------------------------------------------------------}
@@ -363,10 +368,14 @@ bb  """
     def test_debug(self):
         def loc(path):
             return os.path.join(MyDir,path)
-        F=FortranFile(loc('Interface.f90'))
-        F.tostring()
+        #F=FortranFile(loc('Interface.f90'))
+        #F.tostring()
+        return
+        #F=FortranFile(loc('TurbTypes.f90'))
+        #F.write_type_tools(loc('TurbAutoTools_new.f90'))
+        #print(F.tostring())
+        #F.write(loc('ProfileTypes_gen.f90'))
         #print('>>>>')
-        pass
 
 
 

@@ -4,7 +4,6 @@ module ProfileTypes
     use PrecisionMod, only: MK, PROFILE_POLAR_KIND
     use MathConstants, only: NaN
     implicit none
-    
     type T_ProfilePolar
         integer :: nValues !< length of all polar vectors
         real(MK) :: Re !< Reynolds number
@@ -39,18 +38,15 @@ module ProfileTypes
         real(MK) :: camber = NaN
         real(MK) :: thickness_max = NaN
     end type
-
-
-    ! hawc type 
-!      Type Tprofdata
-!          real(4) :: chord         =0.0d0                  ! Chord lenght of section
-!          real(4) :: thickness     =0.0d0                  ! Thickness in % of chord
-!          real(8),dimension(3):: vec_075to025 =[0.0d0,0.0d0,0.0d0] ! vector from C3/4 to C1/4 in [m]
-!          real(4) :: prof_set      =0.0d0                  ! Aerodynamic profile set number for this section
-!          integer :: nazi=360                             ! Number of profiles in interpolated profile coefficient arrays
-!          real(8)  :: dazi=2.0d0*3.14159265359/360     ! distance between data (is set to 2*pi/nazi)
-!          real(4),dimension(:),pointer :: CL,CD,CM         ! Interpolated profile coefficients
-!      end Type Tprofdata
-!  contains
-            
+    ! hawc type
+    !      Type Tprofdata
+    !          real(4) :: chord         =0.0d0                  ! Chord lenght of section
+    !          real(4) :: thickness     =0.0d0                  ! Thickness in % of chord
+    !          real(8),dimension(3):: vec_075to025 =[0.0d0,0.0d0,0.0d0] ! vector from C3/4 to C1/4 in [m]
+    !          real(4) :: prof_set      =0.0d0                  ! Aerodynamic profile set number for this section
+    !          integer :: nazi=360                             ! Number of profiles in interpolated profile coefficient arrays
+    !          real(8)  :: dazi=2.0d0*3.14159265359/360     ! distance between data (is set to 2*pi/nazi)
+    !          real(4),dimension(:),pointer :: CL,CD,CM         ! Interpolated profile coefficients
+    !      end Type Tprofdata
+    !  contains
 end module ProfileTypes
