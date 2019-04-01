@@ -369,6 +369,10 @@ bb  """
         def loc(path):
             return os.path.join(MyDir,path)
         #F=FortranFile(loc('Interface.f90'))
+        #F.write_signatures    (loc('Interface.h'))
+        #F=FortranFile(loc('ProfileTypes.f90'))
+        #F.write(loc('ProfileTypes_gen.f90'))
+        #F.write_type_tools(loc('ProfileAutoTools.f90'))
         #F.tostring()
         return
         #F=FortranFile(loc('TurbTypes.f90'))

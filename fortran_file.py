@@ -221,12 +221,6 @@ class FortranFile(object):
         if bIsInModule:
             raise Exception('No end of module found')
 
-        # --------------------------------------------------------------------------------
-        # --- Analyse raw data
-        # --------------------------------------------------------------------------------
-        for m in self.Modules:
-            m.analyse_raw_data()
-
     def tostring(self,verbose=True):
         """ File to string """
         s=''
@@ -267,7 +261,10 @@ class FortranFile(object):
             filename_out=get_type_tool_filename(self.filename)
         with open(filename_out,'w') as f:
             for m in self.Modules:
-                m.write_type_tools(f)
+                if m is not None:
+                    m.write_type_tools(f)
+                else:
+                    print('>>> Module is None')
 
 
     def write_signatures(self,filename_out='',verbose=False):
@@ -341,15 +338,9 @@ class FortranModule(object):
         self.Elements=[]
         # 
         self.UseStatements=FortranUseStatements([])
-        # Types
-        self.TypeList=[]
-        self.type_dependencies=[]
-        self.type_depend_mod=[]
         # Interfaces #TODO
-        # Variables #TODO
+        # Variables
         self.Declarations=[]
-        # Methods
-        self.MethodList=[]
         # Misc
 
 #         self._declarations_raw         = []
@@ -368,21 +359,22 @@ class FortranModule(object):
 #             self._corpus_comment_raw.append(comment)
 
 
-    def analyse_raw_data(self):
-        #print(self.type+' '+self.name)
-        self.type_dependencies=[]
-        self.type_depend_mod=[]
+    def analyse_types(self):
+        #print('>>>>>'+self.type+' '+self.name)
+        type_dependencies=[]
+        type_depend_mod=[]
         # --------------------------------------------------------------------------------
         # ---  Analysig sub elements
         # --------------------------------------------------------------------------------
-        self.TypeList=[t for t in self.Elements if type(t)==FortranType]
-        self.UseStatements=FortranUseStatements([u for u in self.Elements if type(u)==FortranUseStatement])
+        TypeList=[t for t in self.Elements if type(t)==FortranType]
+        UseStatements=FortranUseStatements([u for u in self.Elements if type(u)==FortranUseStatement])
+
 
         # Analyse Types
-        for t in self.TypeList:
-            #print('TYPE: '+t.raw_name)
+        for t in TypeList:
+            #print('TYPE: '+t.raw_name,t.dependencies)
             #t.analyse_raw_data()
-            self.type_dependencies.append(t.dependencies)
+            type_dependencies.append(t.dependencies)
 
         #for u in self.UseStatements:
             #print('USE : '+str(u))
@@ -392,22 +384,22 @@ class FortranModule(object):
         # --- Type Dependencies
         # --------------------------------------------------------------------------------
         # Analyse Types dependencies at module level
-        D=self.type_dependencies;
+        D=type_dependencies;
         D=[x.lower() for y in D for x in y if x is not None ]
         # Removing duplicates
         D2=[]
         [D2.append(x) for x in D if x not in D2];
         # Removing dependencies from types that are in our module
-        D3=[t.raw_name.lower() for t in self.TypeList ]
+        D3=[t.raw_name.lower() for t in TypeList ]
         D2=[x for x in D2 if x not in D3];
 
-        self.type_dependencies=D2;
+        type_dependencies=D2;
         # --------------------------------------------------------------------------------
         # ---  Attempting to resolve dependencies
         # --------------------------------------------------------------------------------
-        for t in self.type_dependencies:
+        for t in type_dependencies:
             # Attempt 1: explicit include
-            mod_found=self.UseStatements.find_in_only_list(t)
+            mod_found=UseStatements.find_in_only_list(t)
             if mod_found is None:
                 # Attempt 2: finding in module name
                 # removing any extra character from type name
@@ -416,7 +408,7 @@ class FortranModule(object):
                     t2=t2[1:]
                 if t2[0].lower()=='_':
                     t2=t2[1:]
-                mod_found=self.UseStatements.find_in_module_name(t2)
+                mod_found=UseStatements.find_in_module_name(t2)
 
                 pass
             m=mod_found
@@ -428,7 +420,10 @@ class FortranModule(object):
             else:
                 eprint('Warning: Unresolved Dependency: Type %s'%(t))
 
-            self.type_depend_mod.append(m)
+            type_depend_mod.append(m)
+        #print('Type_dependencies:',type_dependencies)
+        #print('Type_depend_mod  :',type_depend_mod)
+        return type_dependencies,type_depend_mod,TypeList
 
     def tostring(self):
         """ Module to string """
@@ -457,20 +452,25 @@ class FortranModule(object):
         s+='end '+self.type+ ' '+self.name
         return s
 
+    def __repr__(self):
+        return self.tostring()
+
     def write_to_file(self,f):
         f.write(self.tostring())
 
     def write_signatures(self,f,verbose=False):
         if verbose:
             f.write('// Signatures from module %s\n'%self.name)
-        for s in self.MethodList:
-            if(s.bind_name!=''):
-                s.write_signature(f,verbose)
+        for s in self.Elements:
+            if type(s)==FortranMethod:
+                if(s.bind_name!=''):
+                    s.write_signature(f,verbose)
 
     def write_signatures_def(self,f):
-        for s in self.MethodList:
-            if(s.bind_name!=''):
-                s.write_signature_def(f)
+        for s in self.Elements:
+            if type(s)==FortranMethod:
+                if(s.bind_name!=''):
+                    s.write_signature_def(f)
 
     def write_type_tools(self,f):
         # A call to that may be needed to set 
@@ -478,15 +478,15 @@ class FortranModule(object):
         #  - TypeList
         #  - type_depend_mod
         #  - type_dependencies
-        #self.analyse_raw_data()
+        type_dependencies,type_depend_mod,TypeList = self.analyse_types()
 
         f.write('module %s\n'%get_type_tool_module(self.name))
         f.write('    ! Module containing type: \n')
         f.write('    use %s\n'%(self.name))
         # Resolved dependencies
-        if len(self.type_depend_mod)>0:
+        if len(type_depend_mod)>0:
             f.write('    ! Friend modules: \n')
-        for (m,t) in zip(self.type_depend_mod,self.type_dependencies):
+        for (m,t) in zip(type_depend_mod,type_dependencies):
             if m is not None:
                 f.write('    use %s\n'%(get_type_tool_module(m)))
             else:
@@ -499,7 +499,7 @@ class FortranModule(object):
         # ---  Interfaces and public attributes
         # --------------------------------------------------------------------------------
         #print(self.TypeList)
-        for t in self.TypeList:
+        for t in TypeList:
             #print('t:',t.pretty_name)
             if(t.pretty_name.lower().find('inputs')>0):
                 TOOLS_LOC=TOOLS+TOOLS_INPUT
@@ -531,7 +531,7 @@ class FortranModule(object):
         # ---  Functions
         # --------------------------------------------------------------------------------
         # The functions of the tools are written by the method write_tools_[INTERFACE] of the class FortranType
-        for t in self.TypeList:
+        for t in TypeList:
             if(t.pretty_name.lower().find('inputs')>0):
                 TOOLS_LOC=TOOLS+TOOLS_INPUT
             else:
